@@ -66,7 +66,7 @@ router.get('/', authenticate, async (req, res, next) => {
 router.get('/:id', authenticate, async (req, res, next) => {
   try {
     const trip = await prisma.trip.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         user: { select: { id: true, companyName: true, ratingAvg: true } },
         auction: {
@@ -117,7 +117,7 @@ router.post('/', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res,
 // PUT /trips/:id
 router.put('/:id', authenticate, async (req, res, next) => {
   try {
-    const trip = await prisma.trip.findUnique({ where: { id: req.params.id } })
+    const trip = await prisma.trip.findUnique({ where: { id: req.params.id as string } })
     if (!trip) return next(errors.notFound('Trip'))
     if (trip.userId !== req.user!.sub && req.user!.role !== 'ADMIN') {
       return next(errors.forbidden())
@@ -127,7 +127,7 @@ router.put('/:id', authenticate, async (req, res, next) => {
     }
 
     const updated = await prisma.trip.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: req.body,
     })
     res.json({ data: updated })
@@ -139,7 +139,7 @@ router.put('/:id', authenticate, async (req, res, next) => {
 // DELETE /trips/:id
 router.delete('/:id', authenticate, async (req, res, next) => {
   try {
-    const trip = await prisma.trip.findUnique({ where: { id: req.params.id } })
+    const trip = await prisma.trip.findUnique({ where: { id: req.params.id as string } })
     if (!trip) return next(errors.notFound('Trip'))
     if (trip.userId !== req.user!.sub && req.user!.role !== 'ADMIN') {
       return next(errors.forbidden())
@@ -148,7 +148,7 @@ router.delete('/:id', authenticate, async (req, res, next) => {
       return next(errors.badRequest('Cannot delete trip in current status'))
     }
 
-    await prisma.trip.delete({ where: { id: req.params.id } })
+    await prisma.trip.delete({ where: { id: req.params.id as string } })
     res.json({ data: { success: true } })
   } catch (err) {
     next(err)

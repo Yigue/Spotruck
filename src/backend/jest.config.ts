@@ -1,4 +1,3 @@
-import { defineConfig } from 'jest'
 import type { Config } from 'jest'
 
 const config: Config = {
@@ -13,8 +12,15 @@ const config: Config = {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'clover'],
+  // Resolve .js extensions so TypeScript-style imports work in Jest (CommonJS/ts-jest)
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', {
+      useESM: false,
+      isolatedModules: true,
+    }],
   },
 }
 

@@ -1,0 +1,1402 @@
+openapi: 3.0.3
+info:
+  title: Spottruck API
+  description: |
+    Plataforma SaaS de subastas inversas para transporte de carga en Argentina.
+
+    ## Autenticación
+    Todas las rutas protegidas requieren `Authorization: Bearer <accessToken>`.
+
+    ## Paginación
+    Los endpoints de lista usan paginación con `page` y `limit`:
+    - `page`: número de página (default 1)
+    - `limit`: items por página (default 20, max 100)
+
+    ## Códigos de error
+    | Código | Descripción |
+    |--------|-------------|
+    | 400 | Bad Request — datos inválidos |
+    | 401 | Unauthorized — token inválido o expirado |
+    | 403 | Forbidden — sin permisos para este recurso |
+    | 404 | Not Found — recurso no existe |
+    | 409 | Conflict — estado incompatible (ej: auction ya cerrada) |
+    | 500 | Internal Server Error |
+  version: 1.0.0
+  contact:
+    name: Spottruck Dev Team
+    email: dev@spottruck.com
+
+servers:
+  - url: http://localhost:4000
+    description: Development
+  - url: https://api.spottruck.com
+    description: Production
+
+tags:
+  - name: Auth
+    description: Autenticación y gestión de sesiones
+  - name: Users
+    description: Perfiles de usuario
+  - name: Trips
+    description: Gestión de viajes
+  - name: Auctions
+    description: Sistema de subastas
+  - name: Payments
+    description: Pagos y liquidaciones
+  - name: Ratings
+    description: Calificaciones y confianza
+  - name: Tracking
+    description: Seguimiento GPS
+
+paths:
+  # ========================
+  # AUTH
+  # ========================
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrar nuevo usuario
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              email: empresa@ejemplo.com
+              password: MiContraseña123!
+              role: COMPANY
+              companyName: Acme Logistica SRL
+      responses:
+        '201':
+          description: Usuario creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email ya registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Iniciar sesión
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refrescar tokens de acceso
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        '200':
+          description: Nuevos tokens generados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Cerrar sesión
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Sesión cerrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Obtener usuario autenticado
+      responses:
+        '200':
+          description: Usuario actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ========================
+  # USERS
+  # ========================
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Obtener perfil del usuario autenticado
+      responses:
+        '200':
+          description: Perfil de usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Users]
+      summary: Actualizar perfil
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Perfil actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Obtener usuario por ID (público)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Usuario encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/ratings:
+    get:
+      tags: [Users]
+      summary: Obtener calificaciones de un usuario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Lista de calificaciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Rating'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  # ========================
+  # TRIPS
+  # ========================
+  /trips:
+    get:
+      tags: [Trips]
+      summary: Listar viajes (filtrable)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TripStatus'
+        - name: cargoType
+          in: query
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: origin
+          in: query
+          schema:
+            type: string
+          description: Filtrar por dirección de origen (búsqueda parcial)
+        - name: dest
+          in: query
+          schema:
+            type: string
+          description: Filtrar por dirección de destino (búsqueda parcial)
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Lista de viajes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Trip'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: [Trips]
+      summary: Crear nuevo viaje
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTripRequest'
+      responses:
+        '201':
+          description: Viaje creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trip'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /trips/{id}:
+    get:
+      tags: [Trips]
+      summary: Obtener viaje por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Viaje encontrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trip:
+                    $ref: '#/components/schemas/Trip'
+                  auction:
+                    $ref: '#/components/schemas/Auction'
+                  bids:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Bid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Trips]
+      summary: Actualizar viaje
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTripRequest'
+      responses:
+        '200':
+          description: Viaje actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trip'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Trips]
+      summary: Eliminar viaje
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Viaje eliminado
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /trips/{id}/publish:
+    post:
+      tags: [Trips]
+      summary: Publicar viaje e iniciar auction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auctionType:
+                  $ref: '#/components/schemas/AuctionType'
+              example:
+                auctionType: OPEN
+      responses:
+        '200':
+          description: Viaje publicado y auction iniciada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trip:
+                    $ref: '#/components/schemas/Trip'
+                  auction:
+                    $ref: '#/components/schemas/Auction'
+        '409':
+          description: Viaje no puede ser publicado (estado incompatible)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ========================
+  # AUCTIONS
+  # ========================
+  /auctions:
+    get:
+      tags: [Auctions]
+      summary: Listar auctions
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/AuctionStatus'
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/AuctionType'
+        - name: tripId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Lista de auctions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Auction'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /auctions/{id}:
+    get:
+      tags: [Auctions]
+      summary: Obtener auction con bids
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Auction con bids
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  auction:
+                    $ref: '#/components/schemas/Auction'
+                  bids:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Bid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /auctions/{id}/bid:
+    post:
+      tags: [Auctions]
+      summary: Realizar una oferta
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: number
+                  description: Monto de la oferta (debe ser menor al precio actual — subasta inversa)
+                  example: 35000
+      responses:
+        '201':
+          description: Oferta realizada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bid:
+                    $ref: '#/components/schemas/Bid'
+                  auction:
+                    $ref: '#/components/schemas/Auction'
+        '400':
+          description: Oferta inválida (monto mayor/igual al actual, auction cerrada)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Solo drivers pueden pujar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auctions/{id}/bids:
+    get:
+      tags: [Auctions]
+      summary: Obtener historial de ofertas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista de bids
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bids:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Bid'
+
+  # ========================
+  # PAYMENTS
+  # ========================
+  /payments/{tripId}:
+    get:
+      tags: [Payments]
+      summary: Obtener pago asociado a un viaje
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /payments/{tripId}/release:
+    post:
+      tags: [Payments]
+      summary: Liberar pago (empresa confirma entrega)
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Pago liberado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          description: Pago no puede ser liberado (estado inválido)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /payments/{tripId}/cancel:
+    post:
+      tags: [Payments]
+      summary: Cancelar viaje y reembolsar
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  example: Cliente canceló el pedido
+      responses:
+        '200':
+          description: Pago reembolsado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /payments/{tripId}/dispute:
+    post:
+      tags: [Payments]
+      summary: Abrir disputa
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Disputa abierta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+
+  # ========================
+  # RATINGS
+  # ========================
+  /ratings:
+    post:
+      tags: [Ratings]
+      summary: Enviar calificación
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRatingRequest'
+      responses:
+        '201':
+          description: Calificación guardada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rating'
+        '400':
+          description: No puedes calificar a vos mismo / Ya calificaste este viaje
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /ratings/{userId}:
+    get:
+      tags: [Ratings]
+      summary: Obtener calificaciones de un usuario
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Calificaciones del usuario
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Rating'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  # ========================
+  # TRACKING
+  # ========================
+  /tracking/{tripId}:
+    post:
+      tags: [Tracking]
+      summary: Registrar posición GPS
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat:
+                  type: number
+                  minimum: -90
+                  maximum: 90
+                  example: -34.6037
+                lng:
+                  type: number
+                  minimum: -180
+                  maximum: 180
+                  example: -58.3816
+                speed:
+                  type: number
+                  description: Velocidad en km/h
+                  example: 85
+                heading:
+                  type: number
+                  description: Rumbo en grados (0-360)
+                  example: 45
+      responses:
+        '201':
+          description: Posición registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackingLog'
+        '403':
+          description: Solo el conductor asignado puede actualizar posición
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tracking/{tripId}/current:
+    get:
+      tags: [Tracking]
+      summary: Obtener posición actual
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Última posición registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackingLog'
+        '404':
+          description: No hay posiciones registradas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tracking/{tripId}/history:
+    get:
+      tags: [Tracking]
+      summary: Obtener historial de ruta
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Historial de posiciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrackingLog'
+
+# ========================
+# COMPONENTS
+# ========================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT de acceso (15 min de TTL)
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+
+  responses:
+    BadRequest:
+      description: Datos inválidos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Token inválido o expirado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Sin permisos para este recurso
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    # ---- Enums ----
+    UserRole:
+      type: string
+      enum: [COMPANY, DRIVER, ADMIN]
+
+    TripStatus:
+      type: string
+      enum: [DRAFT, OPEN, AUCTION, ASSIGNED, IN_PROGRESS, DELIVERED, SETTLED, CANCELLED]
+
+    AuctionType:
+      type: string
+      enum: [OPEN, DUTCH, SEALED]
+
+    AuctionStatus:
+      type: string
+      enum: [PENDING, OPEN, CLOSED, SETTLED, CANCELLED]
+
+    PaymentStatus:
+      type: string
+      enum: [PENDING, HELD, RELEASED, REFUNDED, DISPUTED]
+
+    # ---- Shared ----
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Bad Request
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        details:
+          type: object
+          nullable: true
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 142
+        totalPages:
+          type: integer
+          example: 8
+
+    # ---- Auth ----
+    RegisterRequest:
+      type: object
+      required: [email, password, role]
+      properties:
+        email:
+          type: string
+          format: email
+          example: empresa@ejemplo.com
+        password:
+          type: string
+          minLength: 8
+          example: MiContraseña123!
+        role:
+          $ref: '#/components/schemas/UserRole'
+        companyName:
+          type: string
+          description: Requerido si role=COMPANY
+          example: Acme Logística SRL
+        driverLicense:
+          type: string
+          description: Requerido si role=DRIVER
+          example: D1234567
+        vehiclePlate:
+          type: string
+          description: Opcional para DRIVER
+          example: AB123CD
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT de acceso (válido 15 min)
+        refreshToken:
+          type: string
+          description: JWT de refresh (válido 7 días)
+        user:
+          $ref: '#/components/schemas/User'
+
+    # ---- User ----
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/UserRole'
+        companyName:
+          type: string
+          nullable: true
+        driverLicense:
+          type: string
+          nullable: true
+        vehiclePlate:
+          type: string
+          nullable: true
+        ratingAvg:
+          type: number
+          nullable: true
+          example: 4.7
+        tripsCompleted:
+          type: integer
+          default: 0
+        trustScore:
+          type: number
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserProfile:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            ratingsCount:
+              type: integer
+            joinedAt:
+              type: string
+              format: date
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        companyName:
+          type: string
+        driverLicense:
+          type: string
+        vehiclePlate:
+          type: string
+
+    # ---- Trip ----
+    CreateTripRequest:
+      type: object
+      required: [originAddress, originLat, originLng, destAddress, destLat, destLng, cargoType, cargoWeight, scheduledDate, basePrice]
+      properties:
+        originAddress:
+          type: string
+          example: Av. Corrientes 1234, CABA, Buenos Aires
+        originLat:
+          type: number
+          example: -34.6037
+        originLng:
+          type: number
+          example: -58.3816
+        destAddress:
+          type: string
+          example: Av. Pellegrini 1500, Rosario, Santa Fe
+        destLat:
+          type: number
+          example: -32.9442
+        destLng:
+          type: number
+          example: -60.6505
+        cargoType:
+          type: string
+          example: GRANO
+        cargoWeight:
+          type: number
+          example: 25000
+        scheduledDate:
+          type: string
+          format: date-time
+          description: Fecha y hora de recolección (debe ser futura)
+        basePrice:
+          type: number
+          description: Precio máximo que la empresa está dispuesta a pagar (ARS)
+          example: 50000
+        notes:
+          type: string
+          nullable: true
+          example: Requiere媒体报道 para cargado
+
+    UpdateTripRequest:
+      type: object
+      properties:
+        originAddress:
+          type: string
+        originLat:
+          type: number
+        originLng:
+          type: number
+        destAddress:
+          type: string
+        destLat:
+          type: number
+        destLng:
+          type: number
+        cargoType:
+          type: string
+        cargoWeight:
+          type: number
+        scheduledDate:
+          type: string
+          format: date-time
+        basePrice:
+          type: number
+        notes:
+          type: string
+          nullable: true
+
+    Trip:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        originAddress:
+          type: string
+        originLat:
+          type: number
+        originLng:
+          type: number
+        destAddress:
+          type: string
+        destLat:
+          type: number
+        destLng:
+          type: number
+        cargoType:
+          type: string
+        cargoWeight:
+          type: number
+        scheduledDate:
+          type: string
+          format: date-time
+        basePrice:
+          type: number
+        status:
+          $ref: '#/components/schemas/TripStatus'
+        notes:
+          type: string
+          nullable: true
+        userId:
+          type: string
+          format: uuid
+        user:
+          $ref: '#/components/schemas/User'
+        auction:
+          $ref: '#/components/schemas/Auction'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ---- Auction ----
+    Auction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/AuctionType'
+        status:
+          $ref: '#/components/schemas/AuctionStatus'
+        currentPrice:
+          type: number
+          description: Precio actual (en ARS)
+        reservePrice:
+          type: number
+          nullable: true
+          description: Precio mínimo de reserva (opcional)
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        extensionCount:
+          type: integer
+          default: 0
+          description: Cantidad de extensiones por anti-sniping
+        winnerId:
+          type: string
+          format: uuid
+          nullable: true
+        bidsCount:
+          type: integer
+          default: 0
+        createdAt:
+          type: string
+          format: date-time
+
+    Bid:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        auctionId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          description: Monto ofertado (menor = mejor en subasta inversa)
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            companyName:
+              type: string
+              nullable: true
+            ratingAvg:
+              type: number
+              nullable: true
+
+    # ---- Payment ----
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        driverId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        platformFee:
+          type: number
+          description: Fee de plataforma (8% del amount)
+        netAmount:
+          type: number
+          description: Monto neto para el conductor (amount - platformFee)
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        holdExpiresAt:
+          type: string
+          format: date-time
+        releasedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # ---- Rating ----
+    CreateRatingRequest:
+      type: object
+      required: [tripId, toUserId, score]
+      properties:
+        tripId:
+          type: string
+          format: uuid
+        toUserId:
+          type: string
+          format: uuid
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        punctuality:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+        communication:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+        cargoCondition:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+        comment:
+          type: string
+          nullable: true
+          example: Excelente conductor, llegó puntual
+
+    Rating:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        fromUserId:
+          type: string
+          format: uuid
+        toUserId:
+          type: string
+          format: uuid
+        score:
+          type: integer
+        punctuality:
+          type: integer
+          nullable: true
+        communication:
+          type: integer
+          nullable: true
+        cargoCondition:
+          type: integer
+          nullable: true
+        comment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        fromUser:
+          type: object
+          properties:
+            id:
+              type: string
+            companyName:
+              type: string
+              nullable: true
+
+    # ---- Tracking ----
+    TrackingLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        lat:
+          type: number
+        lng:
+          type: number
+        speed:
+          type: number
+          nullable: true
+        heading:
+          type: number
+          nullable: true
+        recordedAt:
+          type: string
+          format: date-time

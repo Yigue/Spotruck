@@ -76,7 +76,7 @@ router.post('/', authenticate, async (req, res, next) => {
 router.get('/user/:userId', authenticate, async (req, res, next) => {
   try {
     const ratings = await prisma.rating.findMany({
-      where: { toUserId: req.params.userId },
+      where: { toUserId: req.params.userId as string },
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: {

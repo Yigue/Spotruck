@@ -10,7 +10,7 @@ const router = Router()
 router.get('/:tripId/current', authenticate, async (req, res, next) => {
   try {
     const log = await prisma.trackingLog.findFirst({
-      where: { tripId: req.params.tripId },
+      where: { tripId: req.params.tripId as string },
       orderBy: { recordedAt: 'desc' },
     })
     if (!log) return next(errors.notFound('Tracking data'))
@@ -25,7 +25,7 @@ router.get('/:tripId/history', authenticate, async (req, res, next) => {
   try {
     const { limit = '100' } = req.query
     const logs = await prisma.trackingLog.findMany({
-      where: { tripId: req.params.tripId },
+      where: { tripId: req.params.tripId as string },
       orderBy: { recordedAt: 'desc' },
       take: Number(limit),
     })
@@ -45,7 +45,7 @@ router.post('/:tripId', authenticate, async (req, res, next) => {
       heading: z.number().optional(),
     }).parse(req.body)
 
-    const trip = await prisma.trip.findUnique({ where: { id: req.params.tripId } })
+    const trip = await prisma.trip.findUnique({ where: { id: req.params.tripId as string } })
     if (!trip) return next(errors.notFound('Trip'))
     if (!['ASSIGNED', 'IN_PROGRESS'].includes(trip.status)) {
       return next(errors.badRequest('Trip not in progress'))
@@ -53,7 +53,7 @@ router.post('/:tripId', authenticate, async (req, res, next) => {
 
     const log = await prisma.trackingLog.create({
       data: {
-        tripId: req.params.tripId,
+        tripId: req.params.tripId as string,
         lat,
         lng,
         speed,
@@ -63,7 +63,7 @@ router.post('/:tripId', authenticate, async (req, res, next) => {
 
     // Update trip status if needed
     if (trip.status === 'ASSIGNED') {
-      await prisma.trip.update({ where: { id: req.params.tripId }, data: { status: 'IN_PROGRESS' } })
+      await prisma.trip.update({ where: { id: req.params.tripId as string }, data: { status: 'IN_PROGRESS' } })
     }
 
     res.status(201).json({ data: log })

@@ -1,7 +1,7 @@
 import { prisma } from '../models/prisma.js'
 import { auctionService } from '../services/auctionService.js'
 
-declare const setInterval: (fn: () => void, ms: number) => ReturnType<typeof setInterval>
+// setInterval type is inferred correctly
 
 async function runAuctionCron() {
   const now = new Date()

@@ -31,12 +31,12 @@ function signTokens(userId: string, role: string, email: string) {
   const accessToken = jwt.sign(
     { sub: userId, role, email },
     config.jwt.secret,
-    { expiresIn: config.jwt.accessExpiresIn }
+    { expiresIn: config.jwt.accessExpiresIn as jwt.SignOptions['expiresIn'] }
   )
   const refreshToken = jwt.sign(
     { sub: userId, type: 'refresh' },
     config.jwt.secret,
-    { expiresIn: config.jwt.refreshExpiresIn }
+    { expiresIn: config.jwt.refreshExpiresIn as jwt.SignOptions['expiresIn'] }
   )
   return { accessToken, refreshToken }
 }
@@ -110,8 +110,7 @@ router.post('/refresh', async (req, res, next) => {
 })
 
 // POST /auth/logout
-router.post('/logout', authenticate, async (req, res) => {
-  // In a real app we'd invalidate the refresh token in Redis
+router.post('/logout', authenticate, (_req, res) => {
   res.json({ data: { success: true } })
 })
 
@@ -126,7 +125,10 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
       vehicleCapacity: true, ratingAvg: true, tripsCompleted: true, createdAt: true,
     },
   })
-  if (!user) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found' } })
+  if (!user) {
+    res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found' } })
+    return
+  }
   res.json({ data: user })
 })
 

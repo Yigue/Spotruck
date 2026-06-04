@@ -69,7 +69,7 @@ router.post('/release', authenticate, async (req, res, next) => {
 router.get('/:tripId', authenticate, async (req, res, next) => {
   try {
     const payment = await prisma.payment.findFirst({
-      where: { tripId: req.params.tripId },
+      where: { tripId: req.params.tripId as string },
     })
     if (!payment) return next(errors.notFound('Payment'))
     res.json({ data: payment })

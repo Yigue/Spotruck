@@ -13,6 +13,8 @@ export const auctionService = {
         tripId,
         currentPrice: trip.basePrice,
         status: 'PENDING',
+        startTime: new Date(),
+        endTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     })
 

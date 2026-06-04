@@ -1,7 +1,7 @@
 import { prisma } from '../models/prisma.js'
 
 export const notificationService = {
-  async sendEmail(to: string, subject: string, body: string) {
+  async sendEmail(to: string, subject: string, _emailBody: string) {
     // Stub for V1 — use console.log
     // TODO: integrate with SendGrid or AWS SES
     console.log(`[EMAIL] To: ${to}, Subject: ${subject}`)
@@ -39,7 +39,7 @@ export const notificationService = {
     }
   },
 
-  async notifyNewBid(auctionId: string, companyId: string, bidAmount: number) {
+  async notifyNewBid(_auctionId: string, companyId: string, bidAmount: number) {
     const company = await prisma.user.findUnique({ where: { id: companyId } })
     if (company) {
       await this.sendEmail(

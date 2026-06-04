@@ -54,8 +54,7 @@ export const trackingService = {
     const current = lastTwo[0]
     const distance = haversineDistance(current.lat, current.lng, trip.destLat, trip.destLng)
     const speedKmh = current.speed
-
-    if (speedKmh <= 0) return null
+    if (!speedKmh || speedKmh <= 0) return null
 
     const timeHours = distance / speedKmh
     const etaMs = Date.now() + timeHours * 60 * 60 * 1000

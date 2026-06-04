@@ -92,7 +92,7 @@ router.post('/', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res,
         endTime: data.endTime ? new Date(data.endTime!) : new Date(now.getTime() + 24 * 60 * 60 * 1000),
         reservePrice: data.reservePrice ?? trip.basePrice * 0.9,
         currentPrice: trip.basePrice,
-        status: 'PENDING',
+        status: 'OPEN',
       },
     })
 
