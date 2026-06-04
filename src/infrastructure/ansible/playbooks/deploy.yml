@@ -1,0 +1,56 @@
+---
+# Ansible Playbook for Spottruck Provisioning and Deployment
+- name: Provision infrastructure
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - common
+    - docker
+
+- name: Configure application environment
+  hosts: webservers
+  become: true
+  gather_facts: true
+  vars_files:
+    - group_vars/all.yml
+  roles:
+    - app
+
+- name: Deploy backend and frontend services
+  hosts: webservers
+  become: true
+  gather_facts: true
+  vars_files:
+    - group_vars/all.yml
+  roles:
+    - app
+
+- name: Health check deployed services
+  hosts: webservers
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Wait for backend API to be available
+      uri:
+        url: "http://{{ inventory_hostname }}:3001/api/health"
+        status_code: 200
+      register: backend_health
+      retries: 10
+      delay: 10
+      until: backend_health.status == 200
+      ignore_errors: true
+
+    - name: Wait for frontend to be available
+      uri:
+        url: "http://{{ inventory_hostname }}:80"
+        status_code: 200
+      register: frontend_health
+      retries: 10
+      delay: 10
+      until: frontend_health.status == 200
+      ignore_errors: true
+
+    - name: Display health check results
+      debug:
+        msg: "Backend health: {{ backend_health.status | default('unavailable') }}, Frontend health: {{ frontend_health.status | default('unavailable') }}"

@@ -1,0 +1,157 @@
+---
+- name: Install Node.js 20
+  ansible.builtin.apt:
+    name:
+      - nodejs
+      - npm
+    state: present
+
+- name: Add NodeSource Node.js 20 repository
+  ansible.builtin.shell: |
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  args:
+    creates: /usr/bin/node
+  changed_when: true
+
+- name: Install Node.js 20
+  ansible.builtin.apt:
+    name: nodejs
+    state: present
+  notify: Restart Node
+
+- name: Install PostgreSQL client
+  ansible.builtin.apt:
+    name:
+      - postgresql-client
+      - libpq-dev
+    state: present
+
+- name: Create application directory
+  ansible.builtin.file:
+    path: /opt/spottruck
+    state: directory
+    owner: deploy
+    group: deploy
+    mode: '0755'
+
+- name: Check if repo already exists
+  ansible.builtin.stat:
+    path: /opt/spottruck/.git
+  register: repo_exists
+
+- name: Clone repository
+  ansible.builtin.git:
+    repo: "{{ app_repository }}"
+    dest: /opt/spottruck
+    version: "{{ app_branch | default('main') }}"
+    force: true
+  become_user: deploy
+  when: not repo_exists.stat.exists
+
+- name: Pull latest changes
+  ansible.builtin.git:
+    repo: "{{ app_repository }}"
+    dest: /opt/spottruck
+    version: "{{ app_branch | default('main') }}"
+    force: true
+    update: true
+  become_user: deploy
+  when: repo_exists.stat.exists
+  notify: Restart services
+
+- name: Create .env file from template
+  ansible.builtin.template:
+    src: .env.j2
+    dest: /opt/spottruck/.env
+    owner: deploy
+    group: deploy
+    mode: '0600'
+  notify: Restart services
+
+- name: Install backend dependencies
+  ansible.builtin.command:
+    cmd: npm ci
+    chdir: /opt/spottruck/src/backend
+  become_user: deploy
+  environment:
+    PATH: /usr/bin:/bin:/usr/local/bin
+  notify: Restart backend
+
+- name: Generate Prisma client
+  ansible.builtin.command:
+    cmd: npx prisma generate
+    chdir: /opt/spottruck/src/backend
+  become_user: deploy
+  environment:
+    PATH: /usr/bin:/bin:/usr/local/bin
+  notify: Restart backend
+
+- name: Build backend
+  ansible.builtin.command:
+    cmd: npm run build
+    chdir: /opt/spottruck/src/backend
+  become_user: deploy
+  environment:
+    PATH: /usr/bin:/bin:/usr/local/bin
+  notify: Restart backend
+
+- name: Install frontend dependencies
+  ansible.builtin.command:
+    cmd: npm ci
+    chdir: /opt/spottruck/src/frontend
+  become_user: deploy
+  environment:
+    PATH: /usr/bin:/bin:/usr/local/bin
+  notify: Restart frontend
+
+- name: Build frontend
+  ansible.builtin.command:
+    cmd: npm run build
+    chdir: /opt/spottruck/src/frontend
+  become_user: deploy
+  environment:
+    PATH: /usr/bin:/bin:/usr/local/bin
+  notify: Restart frontend
+
+- name: Run database migrations
+  ansible.builtin.command:
+    cmd: npx prisma migrate deploy
+    chdir: /opt/spottruck/src/backend
+  become_user: deploy
+  environment:
+    DATABASE_URL: "{{ database_url }}"
+    PATH: /usr/bin:/bin:/usr/local/bin
+  when: run_migrations | default(true)
+  register: migrate_result
+  failed_when: false
+
+- name: Display migration result
+  ansible.builtin.debug:
+    msg: "Migration result: {{ migrate_result.stdout }}"
+
+- name: Create docker-compose.yml for services
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/spottruck/docker-compose.yml
+    owner: deploy
+    group: deploy
+    mode: '0644'
+  notify: Restart services
+
+- name: Pull latest Docker images
+  ansible.builtin.command:
+    cmd: docker-compose pull
+    chdir: /opt/spottruck
+  become_user: deploy
+  environment:
+    DOCKER_BUILDKIT: "1"
+  when: use_docker_compose | default(false)
+
+- name: Start/restart application services
+  ansible.builtin.shell: |
+    cd /opt/spottruck
+    docker-compose down || true
+    docker-compose up -d
+  become_user: deploy
+  when: use_docker_compose | default(false)
+  notify: Restart services

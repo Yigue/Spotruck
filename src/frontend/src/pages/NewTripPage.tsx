@@ -2,16 +2,27 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../utils/api'
 import toast from 'react-hot-toast'
+import { Input } from '../components/ui/Input'
+import { Select } from '../components/ui/Select'
+import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+
+const cargoTypeOptions = [
+  { value: 'GENERAL', label: 'General' },
+  { value: 'BULK', label: 'Granel' },
+  { value: 'PALLETS', label: 'Pallets' },
+  { value: 'REFRIGERATED', label: 'Refrigerada' },
+]
 
 export default function NewTripPage() {
   const navigate = useNavigate()
   const [form, setForm] = useState({
     originAddress: '',
-    originLat: '-34.6037',
-    originLng: '-58.3816',
+    originLat: '',
+    originLng: '',
     destAddress: '',
-    destLat: '-34.6037',
-    destLng: '-58.3816',
+    destLat: '',
+    destLng: '',
     cargoType: 'GENERAL',
     cargoDesc: '',
     weightKg: '',
@@ -19,24 +30,65 @@ export default function NewTripPage() {
     basePrice: '',
   })
   const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target
+    setForm((f) => ({ ...f, [name]: value }))
+    // Clear error when field is modified
+    if (errors[name]) {
+      setErrors((e) => {
+        const newErrors = { ...e }
+        delete newErrors[name]
+        return newErrors
+      })
+    }
+  }
+
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {}
+
+    if (!form.originAddress.trim()) newErrors.originAddress = 'Requerido'
+    if (!form.destAddress.trim()) newErrors.destAddress = 'Requerido'
+    if (!form.originLat || isNaN(parseFloat(form.originLat)))
+      newErrors.originLat = 'Latitud inválida'
+    if (!form.originLng || isNaN(parseFloat(form.originLng)))
+      newErrors.originLng = 'Longitud inválida'
+    if (!form.destLat || isNaN(parseFloat(form.destLat)))
+      newErrors.destLat = 'Latitud inválida'
+    if (!form.destLng || isNaN(parseFloat(form.destLng)))
+      newErrors.destLng = 'Longitud inválida'
+    if (!form.scheduledDate) newErrors.scheduledDate = 'Requerido'
+    if (!form.basePrice || parseFloat(form.basePrice) <= 0)
+      newErrors.basePrice = 'Precio inválido'
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!validate()) return
+
     setLoading(true)
     try {
       const payload = {
-        ...form,
+        originAddress: form.originAddress,
         originLat: parseFloat(form.originLat),
         originLng: parseFloat(form.originLng),
+        destAddress: form.destAddress,
         destLat: parseFloat(form.destLat),
         destLng: parseFloat(form.destLng),
+        cargoType: form.cargoType,
+        cargoDesc: form.cargoDesc || undefined,
         weightKg: form.weightKg ? parseFloat(form.weightKg) : undefined,
+        scheduledDate: form.scheduledDate,
         basePrice: parseFloat(form.basePrice),
       }
+
       const { data } = await api.post('/trips', payload)
       toast.success('Viaje creado')
       navigate(`/trips/${data.data.id}`)
@@ -50,65 +102,149 @@ export default function NewTripPage() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-6">Publicar nuevo viaje</h1>
-      <form onSubmit={handleSubmit} className="card space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <label className="label">Dirección de origen</label>
-            <input name="originAddress" className="input" value={form.originAddress} onChange={handleChange} required placeholder="Ej: Av. Corrientes 1000, Buenos Aires" />
+
+      <Card>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Origin Address */}
+          <Input
+            label="Dirección de origen"
+            name="originAddress"
+            value={form.originAddress}
+            onChange={handleChange}
+            error={errors.originAddress}
+            required
+            placeholder="Ej: Av. Corrientes 1000, Buenos Aires"
+          />
+
+          {/* Origin Coordinates */}
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Latitud origen"
+              name="originLat"
+              type="number"
+              step="any"
+              value={form.originLat}
+              onChange={handleChange}
+              error={errors.originLat}
+              required
+              placeholder="-34.6037"
+            />
+            <Input
+              label="Longitud origen"
+              name="originLng"
+              type="number"
+              step="any"
+              value={form.originLng}
+              onChange={handleChange}
+              error={errors.originLng}
+              required
+              placeholder="-58.3816"
+            />
           </div>
-          <div>
-            <label className="label">Latitud origen</label>
-            <input name="originLat" type="number" step="any" className="input" value={form.originLat} onChange={handleChange} required />
+
+          {/* Destination Address */}
+          <Input
+            label="Dirección de destino"
+            name="destAddress"
+            value={form.destAddress}
+            onChange={handleChange}
+            error={errors.destAddress}
+            required
+            placeholder="Ej: San Martín 500, Rosario"
+          />
+
+          {/* Destination Coordinates */}
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Latitud destino"
+              name="destLat"
+              type="number"
+              step="any"
+              value={form.destLat}
+              onChange={handleChange}
+              error={errors.destLat}
+              required
+              placeholder="-34.6037"
+            />
+            <Input
+              label="Longitud destino"
+              name="destLng"
+              type="number"
+              step="any"
+              value={form.destLng}
+              onChange={handleChange}
+              error={errors.destLng}
+              required
+              placeholder="-58.3816"
+            />
           </div>
-          <div>
-            <label className="label">Longitud origen</label>
-            <input name="originLng" type="number" step="any" className="input" value={form.originLng} onChange={handleChange} required />
+
+          {/* Cargo Type and Weight */}
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Tipo de carga"
+              name="cargoType"
+              options={cargoTypeOptions}
+              value={form.cargoType}
+              onChange={handleChange}
+            />
+            <Input
+              label="Peso (kg)"
+              name="weightKg"
+              type="number"
+              value={form.weightKg}
+              onChange={handleChange}
+              placeholder="Opcional"
+            />
           </div>
-          <div className="md:col-span-2">
-            <label className="label">Dirección de destino</label>
-            <input name="destAddress" className="input" value={form.destAddress} onChange={handleChange} required placeholder="Ej: San Martín 500, Rosario" />
-          </div>
-          <div>
-            <label className="label">Latitud destino</label>
-            <input name="destLat" type="number" step="any" className="input" value={form.destLat} onChange={handleChange} required />
-          </div>
-          <div>
-            <label className="label">Longitud destino</label>
-            <input name="destLng" type="number" step="any" className="input" value={form.destLng} onChange={handleChange} required />
-          </div>
-          <div>
-            <label className="label">Tipo de carga</label>
-            <select name="cargoType" className="input" value={form.cargoType} onChange={handleChange}>
-              <option value="GENERAL">General</option>
-              <option value="BULK">Granel</option>
-              <option value="PALLETS">Pallets</option>
-              <option value="REFRIGERATED">Refrigerada</option>
-            </select>
-          </div>
-          <div>
-            <label className="label">Peso (kg)</label>
-            <input name="weightKg" type="number" className="input" value={form.weightKg} onChange={handleChange} placeholder="Opcional" />
-          </div>
-          <div className="md:col-span-2">
+
+          {/* Cargo Description */}
+          <div className="space-y-1">
             <label className="label">Descripción de la carga</label>
-            <textarea name="cargoDesc" className="input" rows={2} value={form.cargoDesc} onChange={handleChange} placeholder="Opcional" />
+            <textarea
+              name="cargoDesc"
+              className="input"
+              rows={2}
+              value={form.cargoDesc}
+              onChange={handleChange}
+              placeholder="Opcional"
+            />
           </div>
-          <div>
-            <label className="label">Fecha de viaje</label>
-            <input name="scheduledDate" type="datetime-local" className="input" value={form.scheduledDate} onChange={handleChange} required />
+
+          {/* Scheduled Date and Base Price */}
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Fecha de viaje"
+              name="scheduledDate"
+              type="datetime-local"
+              value={form.scheduledDate}
+              onChange={handleChange}
+              error={errors.scheduledDate}
+              required
+            />
+            <Input
+              label="Precio base (ARS)"
+              name="basePrice"
+              type="number"
+              value={form.basePrice}
+              onChange={handleChange}
+              error={errors.basePrice}
+              required
+              placeholder="Ej: 45000"
+            />
           </div>
-          <div>
-            <label className="label">Precio base (ARS)</label>
-            <input name="basePrice" type="number" className="input" value={form.basePrice} onChange={handleChange} required placeholder="Ej: 45000" />
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4">
+            <Button type="submit" variant="accent" loading={loading}>
+              Publicar viaje
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => navigate('/trips')}>
+              Cancelar
+            </Button>
           </div>
-        </div>
-        <div className="flex gap-3">
-          <button type="submit" disabled={loading} className="btn-primary disabled:opacity-50">
-            {loading ? 'Guardando...' : 'Publicar viaje'}
-          </button>
-          <button type="button" onClick={() => navigate('/trips')} className="btn-ghost">Cancelar</button>
-        </div>
-      </form>
+        </form>
+      </Card>
     </div>
   )
 }

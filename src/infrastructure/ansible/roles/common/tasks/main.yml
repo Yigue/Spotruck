@@ -1,0 +1,51 @@
+---
+# Common role - base system packages and utilities
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install common utilities
+  ansible.builtin.apt:
+    name:
+      - htop
+      - curl
+      - wget
+      - git
+      - unzip
+      - zip
+      - vim
+      - nano
+      - tree
+      - net-tools
+      - dnsutils
+      - ca-certificates
+      - gnupg
+      - lsb-release
+    state: present
+
+- name: Add Docker GPG key
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Add Docker repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ ansible_architecture }}] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_lsb.codename | lower }} stable"
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Create deploy user
+  ansible.builtin.user:
+    name: deploy
+    shell: /bin/bash
+    groups: docker
+    append: true
+    create_home: true
+    state: present
+
+- name: Configure timezone
+  community.general.timezone:
+    name: America/Sao_Paulo
+  ignore_errors: true

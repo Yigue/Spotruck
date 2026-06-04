@@ -1,0 +1,20 @@
+---
+- name: Restart backend
+  ansible.builtin.shell: |
+    cd /opt/spottruck/src/backend
+    docker-compose restart backend || npm run start
+  become_user: deploy
+  listen: Restart services
+
+- name: Restart frontend
+  ansible.builtin.shell: |
+    cd /opt/spottruck/src/frontend
+    docker-compose restart frontend || npm run start
+  become_user: deploy
+  listen: Restart services
+
+- name: Restart Node
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+  listen: Restart services
