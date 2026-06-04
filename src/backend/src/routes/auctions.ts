@@ -1,0 +1,161 @@
+import { Router } from 'express'
+import { z } from 'zod'
+import { prisma } from '../models/prisma.js'
+import { config } from '../config/index.js'
+import { errors } from '../utils/errors.js'
+import { authenticate, requireRole } from '../middleware/auth.js'
+
+const router = Router()
+
+const createAuctionSchema = z.object({
+  tripId: z.string().uuid(),
+  type: z.enum(['OPEN', 'DUTCH', 'SEALED']),
+  startTime: z.string().datetime(),
+  endTime: z.string().datetime(),
+  reservePrice: z.number().positive().optional(),
+})
+
+const bidSchema = z.object({
+  amount: z.number().positive(),
+})
+
+// GET /auctions
+router.get('/', authenticate, async (req, res, next) => {
+  try {
+    const { status, type, page = '1', limit = '20' } = req.query
+    const where: Record<string, unknown> = {}
+    if (status) where.status = status
+    if (type) where.type = type
+
+    const [auctions, total] = await Promise.all([
+      prisma.auction.findMany({
+        where,
+        skip: (Number(page) - 1) * Number(limit),
+        take: Number(limit),
+        orderBy: { startTime: 'desc' },
+        include: {
+          trip: {
+            select: { id: true, originAddress: true, destAddress: true, cargoType: true, basePrice: true, scheduledDate: true },
+          },
+          _count: { select: { bids: true } },
+        },
+      }),
+      prisma.auction.count({ where }),
+    ])
+
+    res.json({ data: auctions, meta: { total, page: Number(page), limit: Number(limit) } })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /auctions/:id
+router.get('/:id', authenticate, async (req, res, next) => {
+  try {
+    const auction = await prisma.auction.findUnique({
+      where: { id: req.params.id },
+      include: {
+        trip: {
+          include: { user: { select: { id: true, companyName: true, ratingAvg: true } } },
+        },
+        bids: {
+          orderBy: { createdAt: 'desc' },
+          include: { user: { select: { id: true, companyName: true, ratingAvg: true } } },
+        },
+      },
+    })
+    if (!auction) return next(errors.notFound('Auction'))
+    res.json({ data: auction })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /auctions
+router.post('/', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res, next) => {
+  try {
+    const data = createAuctionSchema.parse(req.body)
+
+    const trip = await prisma.trip.findUnique({ where: { id: data.tripId } })
+    if (!trip) return next(errors.notFound('Trip'))
+    if (trip.userId !== req.user!.sub && req.user!.role !== 'ADMIN') {
+      return next(errors.forbidden('Not your trip'))
+    }
+    if (trip.status !== 'OPEN') return next(errors.badRequest('Trip must be OPEN to create auction'))
+
+    const auction = await prisma.auction.create({
+      data: {
+        tripId: data.tripId,
+        type: data.type,
+        startTime: new Date(data.startTime),
+        endTime: new Date(data.endTime),
+        reservePrice: data.reservePrice ?? trip.basePrice * 0.9,
+        currentPrice: trip.basePrice,
+        status: 'PENDING',
+      },
+    })
+
+    await prisma.trip.update({ where: { id: data.tripId }, data: { status: 'AUCTION' } })
+
+    res.status(201).json({ data: auction })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /auctions/:id/bid
+router.post('/:id/bid', authenticate, requireRole('DRIVER'), async (req, res, next) => {
+  try {
+    const { amount } = bidSchema.parse(req.body)
+    const auctionId = req.params.id
+
+    const auction = await prisma.auction.findUnique({
+      where: { id: auctionId },
+      include: { trip: true },
+    })
+    if (!auction) return next(errors.notFound('Auction'))
+    if (auction.status !== 'OPEN') return next(errors.badRequest('Auction is not open'))
+    if (new Date() > auction.endTime) return next(errors.badRequest('Auction has ended'))
+
+    const minBid = auction.currentPrice * (1 - config.auction.minBidDecrementPercent)
+    if (amount >= minBid) return next(errors.badRequest(`Bid must be lower than ${minBid}`))
+
+    // Anti-sniping extension
+    const now = new Date()
+    const timeLeft = auction.endTime.getTime() - now.getTime()
+    const antiSnipingWindow = config.auction.antiSnipingWindowMinutes * 60 * 1000
+
+    let newEndTime = auction.endTime
+    if (timeLeft < antiSnipingWindow && auction.extensionCount < config.auction.maxExtensions) {
+      newEndTime = new Date(now.getTime() + config.auction.antiSnipingExtensionMinutes * 60 * 1000)
+    }
+
+    const [bid] = await prisma.$transaction([
+      prisma.bid.create({ data: { auctionId, userId: req.user!.sub, amount } }),
+      prisma.auction.update({
+        where: { id: auctionId },
+        data: { currentPrice: amount, endTime: newEndTime, extensionCount: { increment: newEndTime > auction.endTime ? 1 : 0 } },
+      }),
+    ])
+
+    res.status(201).json({ data: bid })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /auctions/:id/bids
+router.get('/:id/bids', authenticate, async (req, res, next) => {
+  try {
+    const bids = await prisma.bid.findMany({
+      where: { auctionId: req.params.id },
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { id: true, companyName: true, ratingAvg: true } } },
+    })
+    res.json({ data: bids })
+  } catch (err) {
+    next(err)
+  }
+})
+
+export { router as auctionsRouter }

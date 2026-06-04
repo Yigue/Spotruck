@@ -1,0 +1,236 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  COMPANY
+  DRIVER
+  ADMIN
+}
+
+enum CargoType {
+  BULK
+  PALLETS
+  GENERAL
+  REFRIGERATED
+}
+
+enum TripStatus {
+  DRAFT
+  OPEN
+  AUCTION
+  ASSIGNED
+  IN_PROGRESS
+  DELIVERED
+  SETTLED
+  CANCELLED
+}
+
+enum AuctionType {
+  OPEN
+  DUTCH
+  SEALED
+}
+
+enum AuctionStatus {
+  PENDING
+  OPEN
+  CLOSED
+  SETTLED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  HELD
+  RELEASED
+  REFUNDED
+  DISPUTED
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  passwordHash    String   @map("password_hash")
+  role            UserRole @default(COMPANY)
+
+  // Company fields
+  companyName     String?  @map("company_name")
+  companyCuit    String?  @map("company_cuit")
+  phone           String?
+
+  // Driver fields
+  driverLicense  String?  @map("driver_license")
+  vehiclePlate   String?  @map("vehicle_plate")
+  vehicleType    String?  @map("vehicle_type")
+  vehicleCapacity Float?  @map("vehicle_capacity_kg")
+
+  // Stats
+  ratingAvg      Float    @default(0) @map("rating_avg")
+  ratingCount    Int      @default(0) @map("rating_count")
+  tripsCompleted Int      @default(0) @map("trips_completed")
+  trustScore     Float    @default(0.5) @map("trust_score")
+
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  trips          Trip[]
+  bids           Bid[]
+  ratingsGiven   Rating[] @relation("ratings_given")
+  ratingsReceived Rating[] @relation("ratings_received")
+  payments       Payment[]
+
+  @@map("users")
+}
+
+model Trip {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  user            User      @relation(fields: [userId], references: [id])
+
+  // Origin
+  originAddress   String    @map("origin_address")
+  originLat       Float     @map("origin_lat")
+  originLng       Float     @map("origin_lng")
+
+  // Destination
+  destAddress     String    @map("dest_address")
+  destLat         Float     @map("dest_lat")
+  destLng         Float     @map("dest_lng")
+
+  // Cargo
+  cargoType       CargoType @map("cargo_type")
+  cargoDesc       String?   @map("cargo_desc")
+  weightKg        Float?    @map("weight_kg")
+
+  // Scheduling
+  scheduledDate   DateTime  @map("scheduled_date")
+
+  // Pricing
+  basePrice       Float     @map("base_price")
+
+  // Status
+  status          TripStatus @default(DRAFT)
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  auction         Auction?
+  payments        Payment[]
+  ratings         Rating[]
+  trackingLogs    TrackingLog[]
+
+  @@map("trips")
+}
+
+model Auction {
+  id              String        @id @default(uuid())
+  tripId          String        @unique @map("trip_id")
+  trip            Trip          @relation(fields: [tripId], references: [id])
+
+  type            AuctionType   @default(OPEN)
+  startTime       DateTime      @map("start_time")
+  endTime         DateTime      @map("end_time")
+  status          AuctionStatus @default(PENDING)
+
+  currentPrice    Float         @map("current_price")
+  reservePrice    Float?        @map("reserve_price")
+
+  extensionCount  Int           @default(0) @map("extension_count")
+
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  bids            Bid[]
+
+  @@map("auctions")
+}
+
+model Bid {
+  id              String    @id @default(uuid())
+  auctionId       String    @map("auction_id")
+  auction         Auction   @relation(fields: [auctionId], references: [id])
+  userId          String    @map("user_id")
+  user            User      @relation(fields: [userId], references: [id])
+
+  amount          Float
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@map("bids")
+  @@index([auctionId, createdAt(sort: Desc)])
+}
+
+model Payment {
+  id                String        @id @default(uuid())
+  tripId            String        @map("trip_id")
+  trip              Trip          @relation(fields: [tripId], references: [id])
+  userId            String        @map("user_id")
+  user              User          @relation(fields: [userId], references: [id])
+
+  amount            Float
+  platformFee       Float         @map("platform_fee")
+  netAmount         Float         @map("net_amount")
+  status            PaymentStatus @default(PENDING)
+
+  mercadopagoId    String?       @map("mercadopago_id")
+  holdExpiresAt    DateTime?     @map("hold_expires_at")
+
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  @@map("payments")
+}
+
+model Rating {
+  id              String    @id @default(uuid())
+  tripId          String    @map("trip_id")
+  trip            Trip      @relation(fields: [tripId], references: [id])
+  fromUserId      String    @map("from_user_id")
+  fromUser        User      @relation("ratings_given", fields: [fromUserId], references: [id])
+  toUserId        String    @map("to_user_id")
+  toUser          User      @relation("ratings_received", fields: [toUserId], references: [id])
+
+  score           Float     // 1-5
+  punctuality     Float?    // 1-5
+  communication   Float?    // 1-5
+  cargoCondition  Float?    // 1-5
+  comment         String?
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@unique([tripId, fromUserId])
+  @@map("ratings")
+}
+
+model TrackingLog {
+  id              String    @id @default(uuid())
+  tripId          String    @map("trip_id")
+  trip            Trip      @relation(fields: [tripId], references: [id])
+
+  lat             Float
+  lng             Float
+  speed           Float?    // km/h
+  heading         Float?    // degrees
+
+  recordedAt      DateTime  @default(now()) @map("recorded_at")
+
+  @@map("tracking_logs")
+  @@index([tripId, recordedAt])
+}
