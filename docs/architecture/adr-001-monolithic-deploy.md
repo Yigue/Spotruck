@@ -1,69 +1,48 @@
-# ADR-001: Monolithic Deploy for V1
+# ADR-001 — Monolithic Deploy for V1
 
-**Status:** Accepted  
+**Status:** Accepted
 **Date:** 2026-06-04
+**Deciders:** Project Team
+
+---
 
 ## Context
 
-Spottruck is a startup project with a small development team. The primary constraints are:
+Spottruck starts as a small startup project with a limited team. The system needs to handle the core flow: companies post trips, drivers bid in auctions, payments are processed. We need to ship V1 fast with minimal operational overhead.
 
-- **Speed to market**: Need to validate the business model quickly
-- **Limited team size**: 2-4 developers, no dedicated DevOps/SRE
-- **Cost sensitivity**: Minimal infrastructure overhead
-- **Uncertain scale**: Unknown traffic patterns, need to learn before investing in complex infra
-
-The platform consists of a React frontend, Express/Node.js backend, PostgreSQL database, and Redis cache.
+---
 
 ## Decision
 
-We will deploy Spottruck V1 as a **monolithic application** with the following characteristics:
+We will deploy Spottruck as a **monolithic application** for V1:
+- Single GitHub repository
+- Single Docker Compose stack (backend + frontend + postgres + redis)
+- Single ECS service (both containers in same task)
+- Shared PostgreSQL database (no per-service DBs)
 
-- **Single repository** containing both frontend and backend
-- **Single Docker Compose** stack for local development
-- **Single ECS service** (Fargate) in production
-- **Shared PostgreSQL database** (RDS) with schema separation
-- **Shared Redis** (ElastiCache) for sessions and caching
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      ECS Service (Fargate)                  │
-│  ┌─────────────────┐    ┌─────────────────┐                 │
-│  │   Frontend      │    │   Backend       │                 │
-│  │   (React SPA)   │    │   (Express)     │                 │
-│  │   Port 3000     │    │   Port 4000     │                 │
-│  └─────────────────┘    └─────────────────┘                 │
-└─────────────────────────────────────────────────────────────┘
-```
+---
 
 ## Consequences
 
-### Positive
-- **Faster initial development**: Single codebase, simpler CI/CD
-- **Easier debugging**: No network hops between services
-- **Lower cost**: Single ECS service, simpler networking
-- **Simplified local development**: One `docker compose up` starts everything
-- **Easier schema migrations**: No distributed transaction concerns
+**Positive:**
+- Fast to ship — no service discovery, no distributed tracing needed
+- Simple local development with `docker compose up`
+- Single CI pipeline
+- Easy to refactor boundaries later
 
-### Negative
-- **Scaling asymmetry**: Can't scale frontend separately from backend
-- **Technology coupling**: Eventually need to choose different tech for different parts
-- **Deployment coupling**: Full stack deploy even for frontend-only changes
-- **Eventual rewrite risk**: Architecture may not support V2 scale
+**Negative:**
+- Coupling risk — one team's deploy affects the whole system
+- Scaling is coarse — can't scale backend without scaling frontend
+- Technology lock-in — moving a service to another stack requires full migration
 
-### Future Migration Path
+**Mitigation:**
+- Clean module boundaries within the codebase (routes/, services/, models/)
+- API contract documented in OpenAPI format
+- Decision to split will be revisited at 1000 DAU or if team > 5 engineers
 
-When the monolith becomes a bottleneck, we will split into:
+---
 
-1. **Bounded Contexts**: Auth, Trips, Auctions, Payments, Tracking, Ratings
-2. **Extract by API**: Each context becomes its own service with its own DB
-3. **Event-Driven**: Use RabbitMQ for async communication between services
+## Alternatives Considered
 
-This ADR will be revisited when:
-- Deployment frequency drops below 2x/week due to coordination
-- Team grows beyond 8 developers
-- One component consistently needs more resources than others
-
-## References
-
-- [AWS ECS Deployment](https://docs.aws.amazon.com/ecs/)
-- [Docker Compose in Production](https://docs.docker.com/compose/production/)
+- **Microservices immediately:** Rejected — premature optimization, high operational cost
+- **Modular monolith:** Not necessary yet; will migrate to this if needed
