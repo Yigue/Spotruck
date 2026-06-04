@@ -9,9 +9,9 @@ const router = Router()
 
 const createAuctionSchema = z.object({
   tripId: z.string().uuid(),
-  type: z.enum(['OPEN', 'DUTCH', 'SEALED']),
-  startTime: z.string().datetime(),
-  endTime: z.string().datetime(),
+  type: z.enum(['OPEN', 'DUTCH', 'SEALED']).default('OPEN'),
+  startTime: z.string().datetime().optional(),
+  endTime: z.string().datetime().optional(),
   reservePrice: z.number().positive().optional(),
 })
 
@@ -53,7 +53,7 @@ router.get('/', authenticate, async (req, res, next) => {
 router.get('/:id', authenticate, async (req, res, next) => {
   try {
     const auction = await prisma.auction.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         trip: {
           include: { user: { select: { id: true, companyName: true, ratingAvg: true } } },
@@ -83,12 +83,13 @@ router.post('/', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res,
     }
     if (trip.status !== 'OPEN') return next(errors.badRequest('Trip must be OPEN to create auction'))
 
+    const now = new Date()
     const auction = await prisma.auction.create({
       data: {
         tripId: data.tripId,
         type: data.type,
-        startTime: new Date(data.startTime),
-        endTime: new Date(data.endTime),
+        startTime: data.startTime ? new Date(data.startTime!) : now,
+        endTime: data.endTime ? new Date(data.endTime!) : new Date(now.getTime() + 24 * 60 * 60 * 1000),
         reservePrice: data.reservePrice ?? trip.basePrice * 0.9,
         currentPrice: trip.basePrice,
         status: 'PENDING',
@@ -107,7 +108,7 @@ router.post('/', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res,
 router.post('/:id/bid', authenticate, requireRole('DRIVER'), async (req, res, next) => {
   try {
     const { amount } = bidSchema.parse(req.body)
-    const auctionId = req.params.id
+    const auctionId = req.params.id as string
 
     const auction = await prisma.auction.findUnique({
       where: { id: auctionId },
@@ -148,7 +149,7 @@ router.post('/:id/bid', authenticate, requireRole('DRIVER'), async (req, res, ne
 router.get('/:id/bids', authenticate, async (req, res, next) => {
   try {
     const bids = await prisma.bid.findMany({
-      where: { auctionId: req.params.id },
+      where: { auctionId: req.params.id as string },
       orderBy: { createdAt: 'desc' },
       include: { user: { select: { id: true, companyName: true, ratingAvg: true } } },
     })
