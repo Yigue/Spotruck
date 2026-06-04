@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { TripDetailMap } from '../components/maps/TripDetailMap'
 import { AuctionCard } from '../components/auctions/AuctionCard'
 import { BidForm } from '../components/auctions/BidForm'
@@ -11,6 +11,7 @@ import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { useAuthStore } from '../hooks/useAuthStore'
+import { useWebSocket } from '../hooks/useWebSocket'
 import api from '../utils/api'
 
 interface Trip {
@@ -85,6 +86,21 @@ export default function TripDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showRating, setShowRating] = useState(false)
+
+  const handleWSMessage = useCallback((msg: { type: string; [key: string]: unknown }) => {
+    if (msg.type === 'auction_update' && id) {
+      // Refresh auction data when a new bid arrives
+      api.get(`/trips/${id}`).then(({ data }) => setTrip(data.data)).catch(() => {})
+    }
+  }, [id])
+
+  const { subscribe } = useWebSocket(handleWSMessage)
+
+  useEffect(() => {
+    if (trip?.auction?.id) {
+      subscribe(trip.auction.id)
+    }
+  }, [trip?.auction?.id, subscribe])
 
   useEffect(() => {
     if (!id) return

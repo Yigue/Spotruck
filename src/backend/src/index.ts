@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
+import { createServer } from 'http'
 import { config } from './config/index.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { authRouter } from './routes/auth.js'
@@ -11,8 +12,10 @@ import { auctionsRouter } from './routes/auctions.js'
 import { paymentsRouter } from './routes/payments.js'
 import { ratingsRouter } from './routes/ratings.js'
 import { trackingRouter } from './routes/tracking.js'
+import { setupWebSocket } from './websocket/index.js'
 
 const app = express()
+const server = createServer(app)
 
 // Middleware
 app.use(helmet())
@@ -38,5 +41,14 @@ app.use((_, res) => res.status(404).json({ error: 'Not found' }))
 
 // Error handler
 app.use(errorHandler)
+
+// WebSocket server
+const wss = setupWebSocket(server)
+;(global as unknown as { wss?: typeof wss }).wss = wss
+
+// Start server
+server.listen(config.port, () => {
+  console.log(`Server running on port ${config.port}`)
+})
 
 export { app }
