@@ -17,6 +17,9 @@ router.post('/hold', authenticate, async (req, res, next) => {
       include: { auction: true },
     })
     if (!trip) return next(errors.notFound('Trip'))
+    if (trip.userId !== req.user!.sub && req.user!.role !== 'ADMIN') {
+      return next(errors.forbidden('Only the trip owner can hold a payment'))
+    }
     if (trip.status !== 'AUCTION') return next(errors.badRequest('Trip must be in AUCTION status'))
 
     const amount = trip.auction!.currentPrice
@@ -46,6 +49,12 @@ router.post('/hold', authenticate, async (req, res, next) => {
 router.post('/release', authenticate, async (req, res, next) => {
   try {
     const { tripId } = z.object({ tripId: z.string().uuid() }).parse(req.body)
+
+    const trip = await prisma.trip.findUnique({ where: { id: tripId } })
+    if (!trip) return next(errors.notFound('Trip'))
+    if (trip.userId !== req.user!.sub && req.user!.role !== 'ADMIN') {
+      return next(errors.forbidden('Only the trip owner can release a payment'))
+    }
 
     const payment = await prisma.payment.findFirst({
       where: { tripId, status: 'HELD' },

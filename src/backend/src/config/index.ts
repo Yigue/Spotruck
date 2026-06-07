@@ -1,10 +1,20 @@
+const DEV_JWT_SECRET = 'dev-secret-change-in-prod'
+const isProduction = (process.env.NODE_ENV || 'development') === 'production'
+const jwtSecret = process.env.JWT_SECRET || ''
+
+if (isProduction && (!jwtSecret || jwtSecret === DEV_JWT_SECRET)) {
+  throw new Error(
+    'JWT_SECRET is not configured. Set a strong JWT_SECRET environment variable before starting in production.'
+  )
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
 
   jwt: {
-    secret: process.env.JWT_SECRET || 'dev-secret-change-in-prod',
+    secret: jwtSecret || DEV_JWT_SECRET,
     accessExpiresIn: '15m',
     refreshExpiresIn: '7d',
   },

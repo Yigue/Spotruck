@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../hooks/useAuthStore'
 
 const navItems = [
@@ -8,7 +7,7 @@ const navItems = [
   { to: '/auctions', label: 'Subastas', icon: '🔨' },
 ]
 
-export default function Layout({ children }: { children: ReactNode }) {
+export default function Layout() {
   const { user, logout } = useAuthStore()
   const location = useLocation()
 
@@ -52,7 +51,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 p-6 overflow-auto">
-        {children}
+        <Outlet />
       </main>
     </div>
   )

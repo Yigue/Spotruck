@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { TripCard } from '../components/trips/TripCard'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Spinner } from '../components/ui/Spinner'
@@ -18,7 +18,7 @@ interface Trip {
   basePrice: number
   status: string
   user?: { companyName?: string; ratingAvg: number }
-  auction?: { currentPrice: number; status: string }
+  auction?: { id: string; currentPrice: number; status: string }
 }
 
 interface PaginationInfo {
@@ -50,6 +50,8 @@ const cargoTypeOptions = [
 
 export default function TripsPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const auctionId = searchParams.get('auction') ?? ''
   const [trips, setTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -115,6 +117,17 @@ export default function TripsPage() {
 
   const hasActiveFilters = statusFilter || cargoTypeFilter || minPrice || maxPrice
 
+  const matchedTrip = useMemo(
+    () => (auctionId ? trips.find((t) => t.auction?.id === auctionId) ?? null : null),
+    [auctionId, trips],
+  )
+
+  const clearAuctionFilter = () => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('auction')
+    setSearchParams(next)
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -123,6 +136,28 @@ export default function TripsPage() {
           + Publicar viaje
         </Button>
       </div>
+
+      {auctionId && (
+        <div
+          data-testid="auction-filter-banner"
+          className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-accent/40 bg-accent-50 px-4 py-3"
+        >
+          <div className="text-sm">
+            <span className="font-medium">Filtrando por subasta:</span>{' '}
+            <span className="font-mono text-text-muted">{auctionId}</span>
+            {matchedTrip ? (
+              <span className="ml-2 text-text-muted">
+                · {matchedTrip.originAddress} → {matchedTrip.destAddress}
+              </span>
+            ) : (
+              <span className="ml-2 text-text-muted">· buscando coincidencia…</span>
+            )}
+          </div>
+          <Button variant="ghost" onClick={clearAuctionFilter}>
+            Quitar filtro
+          </Button>
+        </div>
+      )}
 
       {/* Filter bar */}
       <Card className="mb-6">
@@ -203,13 +238,22 @@ export default function TripsPage() {
           {trips.length > 0 ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {trips.map((trip) => (
-                  <TripCard
-                    key={trip.id}
-                    trip={trip}
-                    onClick={() => navigate(`/trips/${trip.id}`)}
-                  />
-                ))}
+                {trips.map((trip) => {
+                  const highlighted = !!auctionId && trip.auction?.id === auctionId
+                  return (
+                    <div
+                      key={trip.id}
+                      data-testid={highlighted ? 'auction-matched-trip' : undefined}
+                      ref={highlighted ? (el) => el?.scrollIntoView({ block: 'center', behavior: 'smooth' }) : undefined}
+                      className={highlighted ? 'rounded-lg ring-2 ring-accent ring-offset-2 ring-offset-bg' : ''}
+                    >
+                      <TripCard
+                        trip={trip}
+                        onClick={() => navigate(`/trips/${trip.id}`)}
+                      />
+                    </div>
+                  )
+                })}
               </div>
 
               {/* Pagination controls */}
@@ -245,12 +289,16 @@ export default function TripsPage() {
               icon="🚚"
               title="No hay viajes"
               description={
-                hasActiveFilters
+                auctionId
+                  ? 'No hay viajes que coincidan con la subasta seleccionada'
+                  : hasActiveFilters
                   ? 'No hay viajes que coincidan con los filtros'
                   : 'Aún no hay viajes publicados'
               }
               action={
-                hasActiveFilters
+                auctionId
+                  ? { label: 'Quitar filtro de subasta', onClick: clearAuctionFilter }
+                  : hasActiveFilters
                   ? { label: 'Limpiar filtros', onClick: clearFilters }
                   : { label: 'Crear viaje', onClick: () => navigate('/trips/new') }
               }

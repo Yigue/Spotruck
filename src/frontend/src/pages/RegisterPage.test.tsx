@@ -3,6 +3,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import api from '../utils/api'
 
+// Hoisted mock variables - safe inside vi.mock factories (no TDZ)
+const { mockSetAuth, mockNavigate } = vi.hoisted(() => ({
+  mockSetAuth: vi.fn(),
+  mockNavigate: vi.fn(),
+}))
+
 // Mock api
 vi.mock('../utils/api', () => ({
   default: {
@@ -11,13 +17,18 @@ vi.mock('../utils/api', () => ({
 }))
 
 // Mock useAuthStore
-let mockSetAuth = vi.fn()
 vi.mock('../hooks/useAuthStore', () => ({
   useAuthStore: vi.fn((selector?: (s: any) => any) => {
     const state = { token: null, refreshToken: null, user: null, setAuth: mockSetAuth, logout: vi.fn() }
     return selector ? selector(state) : state
   }),
 }))
+
+// Mock react-router-dom
+vi.mock('react-router-dom', async () => {
+  const actual = await import('react-router-dom')
+  return { ...actual, useNavigate: () => mockNavigate }
+})
 
 import RegisterPage from '../pages/RegisterPage'
 
@@ -31,7 +42,6 @@ const renderRegister = () =>
 describe('RegisterPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockSetAuth = vi.fn()
   })
 
   it('renders role select and email/password fields', () => {
@@ -89,12 +99,6 @@ describe('RegisterPage', () => {
   })
 
   it('sets auth and navigates to dashboard on success', async () => {
-    const mockNavigate = vi.fn()
-    vi.mock('react-router-dom', async () => {
-      const actual = await import('react-router-dom')
-      return { ...actual, useNavigate: () => mockNavigate }
-    })
-
     vi.mocked(api.post).mockResolvedValue({
       data: {
         data: {

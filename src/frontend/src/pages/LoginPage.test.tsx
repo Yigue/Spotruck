@@ -4,6 +4,12 @@ import { BrowserRouter } from 'react-router-dom'
 import { useAuthStore } from '../hooks/useAuthStore'
 import api from '../utils/api'
 
+// Hoisted mock variables - safe inside vi.mock factories (no TDZ)
+const { mockSetAuth, mockNavigate } = vi.hoisted(() => ({
+  mockSetAuth: vi.fn(),
+  mockNavigate: vi.fn(),
+}))
+
 // Mock api
 vi.mock('../utils/api', () => ({
   default: {
@@ -11,9 +17,7 @@ vi.mock('../utils/api', () => ({
   },
 }))
 
-// Mock useAuthStore - we need fresh state each test
-let mockSetAuth: ReturnType<typeof vi.fn>
-
+// Mock useAuthStore
 vi.mock('../hooks/useAuthStore', () => ({
   useAuthStore: vi.fn((selector?: (s: any) => any) => {
     const state = {
@@ -27,6 +31,12 @@ vi.mock('../hooks/useAuthStore', () => ({
   }),
 }))
 
+// Mock react-router-dom
+vi.mock('react-router-dom', async () => {
+  const actual = await import('react-router-dom')
+  return { ...actual, useNavigate: () => mockNavigate }
+})
+
 import LoginPage from '../pages/LoginPage'
 
 const renderLogin = () =>
@@ -39,7 +49,6 @@ const renderLogin = () =>
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockSetAuth = vi.fn()
   })
 
   it('renders email and password inputs', () => {
@@ -78,12 +87,6 @@ describe('LoginPage', () => {
   })
 
   it('sets auth and navigates to dashboard on success', async () => {
-    const mockNavigate = vi.fn()
-    vi.mock('react-router-dom', async () => {
-      const actual = await import('react-router-dom')
-      return { ...actual, useNavigate: () => mockNavigate }
-    })
-
     vi.mocked(api.post).mockResolvedValue({
       data: {
         data: {

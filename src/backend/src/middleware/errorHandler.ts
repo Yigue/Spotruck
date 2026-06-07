@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
+import { z } from 'zod'
 import { AppError } from '../utils/errors.js'
 
 export function errorHandler(
@@ -13,6 +14,16 @@ export function errorHandler(
         code: err.code,
         message: err.message,
         details: err.details,
+      },
+    })
+  }
+
+  if (err instanceof z.ZodError) {
+    return res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid request data',
+        details: err.errors,
       },
     })
   }

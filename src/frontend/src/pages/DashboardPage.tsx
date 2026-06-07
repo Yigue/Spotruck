@@ -40,29 +40,53 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      try {
-        // Fetch user stats from /users/me
-        const userResponse = await api.get('/users/me')
-        const userData = userResponse.data.data
+      const [meResult, assignedResult, inProgressResult, settledResult, recentResult] =
+        await Promise.allSettled([
+          api.get('/users/me'),
+          api.get('/trips', { params: { status: 'ASSIGNED', limit: 1 } }),
+          api.get('/trips', { params: { status: 'IN_PROGRESS', limit: 1 } }),
+          api.get('/trips', { params: { status: 'SETTLED', limit: 1 } }),
+          api.get('/trips', { params: { limit: 5 } }),
+        ])
+
+      const tripsActive =
+        (assignedResult.status === 'fulfilled'
+          ? assignedResult.value.data.meta?.total ?? 0
+          : 0) +
+        (inProgressResult.status === 'fulfilled'
+          ? inProgressResult.value.data.meta?.total ?? 0
+          : 0)
+
+      const auctionsWon =
+        settledResult.status === 'fulfilled'
+          ? settledResult.value.data.meta?.total ?? 0
+          : 0
+
+      if (meResult.status === 'fulfilled') {
+        const userData = meResult.value.data.data
         setStats({
-          tripsActive: userData.tripsActive || 0,
-          tripsCompleted: userData.tripsCompleted || 0,
-          auctionsWon: userData.auctionsWon || 0,
-          pendingBids: userData.pendingBids || 0,
+          tripsActive,
+          tripsCompleted: userData.tripsCompleted ?? 0,
+          auctionsWon,
+          // No /me/bids endpoint exists yet; show 0 until backend exposes it.
+          pendingBids: 0,
         })
-      } catch {
-        // Stats not available, keep defaults
+      } else {
+        setStats({
+          tripsActive,
+          tripsCompleted: 0,
+          auctionsWon,
+          pendingBids: 0,
+        })
       }
 
-      try {
-        // Fetch recent trips
-        const tripsResponse = await api.get('/trips', { params: { limit: 5 } })
-        setRecentTrips(tripsResponse.data.data || [])
-      } catch {
+      if (recentResult.status === 'fulfilled') {
+        setRecentTrips(recentResult.value.data.data || [])
+      } else {
         setError('Error al cargar datos')
-      } finally {
-        setLoading(false)
       }
+
+      setLoading(false)
     }
 
     fetchData()

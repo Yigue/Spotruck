@@ -80,7 +80,7 @@ export function RatingForm({ tripId, toUserId, onRated }: RatingFormProps) {
       await api.post('/ratings', {
         tripId,
         toUserId,
-        overallScore: rating.overall,
+        score: rating.overall,
         punctuality: rating.punctuality,
         communication: rating.communication,
         cargoCondition: rating.cargoCondition,

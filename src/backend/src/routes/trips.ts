@@ -20,6 +20,8 @@ const createTripSchema = z.object({
   basePrice: z.number().positive(),
 })
 
+const updateTripSchema = createTripSchema.partial().strict()
+
 const tripWhereSchema = z.object({
   status: z.string().optional(),
   cargoType: z.string().optional(),
@@ -126,9 +128,11 @@ router.put('/:id', authenticate, async (req, res, next) => {
       return next(errors.badRequest('Cannot edit trip in current status'))
     }
 
+    const data = updateTripSchema.parse(req.body)
+
     const updated = await prisma.trip.update({
       where: { id: req.params.id as string },
-      data: req.body,
+      data,
     })
     res.json({ data: updated })
   } catch (err) {

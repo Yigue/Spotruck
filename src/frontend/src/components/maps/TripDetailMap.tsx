@@ -31,10 +31,9 @@ const destIcon = L.icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
 })
 
-const centerLat = (originLat + destLat) / 2
-const centerLng = (originLng + destLng) / 2
-
 export function TripDetailMap({ originLat, originLng, destLat, destLng, originAddress, destAddress }: TripDetailMapProps) {
+  const centerLat = (originLat + destLat) / 2
+  const centerLng = (originLng + destLng) / 2
   return (
     <MapContainer
       center={[centerLat, centerLng]}

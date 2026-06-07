@@ -8,13 +8,14 @@ interface WSMessage {
 
 export function useWebSocket(onMessage: (msg: WSMessage) => void) {
   const wsRef = useRef<WebSocket | null>(null)
-  const { user } = useAuthStore()
+  const { token, user } = useAuthStore()
+  const authToken = token || user?.accessToken
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout>>()
 
   const connect = useCallback(() => {
-    if (!user?.accessToken) return
+    if (!authToken) return
 
-    const ws = new WebSocket(`ws://localhost:4000/ws?token=${user.accessToken}`)
+    const ws = new WebSocket(`ws://localhost:4000/ws?token=${authToken}`)
     wsRef.current = ws
 
     ws.onopen = () => {
@@ -38,17 +39,17 @@ export function useWebSocket(onMessage: (msg: WSMessage) => void) {
     ws.onerror = () => {
       ws.close()
     }
-  }, [user?.accessToken, onMessage])
+  }, [authToken, onMessage])
 
   useEffect(() => {
-    if (user?.accessToken) {
+    if (authToken) {
       connect()
     }
     return () => {
       clearTimeout(reconnectTimeout.current)
       wsRef.current?.close()
     }
-  }, [user?.accessToken, connect])
+  }, [authToken, connect])
 
   const subscribe = useCallback((auctionId: string) => {
     wsRef.current?.send(JSON.stringify({ type: 'subscribe', payload: { auctionId } }))
