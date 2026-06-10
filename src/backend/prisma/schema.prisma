@@ -60,6 +60,24 @@ enum PaymentStatus {
   DISPUTED
 }
 
+enum TruckType {
+  JAULA
+  SEMI
+  TOLVA
+  BATEA
+  FURGON
+  REFRIGERADO
+  PLAYO
+  OTRO
+}
+
+enum BidStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -80,6 +98,13 @@ model User {
   vehiclePlate   String?  @map("vehicle_plate")
   vehicleType    String?  @map("vehicle_type")
   vehicleCapacity Float?  @map("vehicle_capacity_kg")
+  preferredZone  String?  @map("preferred_zone")
+
+  // Profile
+  emailVerified  Boolean  @default(false) @map("email_verified")
+  address        String?
+  website        String?
+  sector         String?
 
   // Stats
   ratingAvg      Float    @default(0) @map("rating_avg")
@@ -95,8 +120,35 @@ model User {
   ratingsGiven   Rating[] @relation("ratings_given")
   ratingsReceived Rating[] @relation("ratings_received")
   payments       Payment[]
+  trucks         Truck[]
+  notifications  Notification[]
 
   @@map("users")
+}
+
+model Truck {
+  id              String     @id @default(uuid())
+  ownerId         String     @map("owner_id")
+  owner           User       @relation(fields: [ownerId], references: [id])
+
+  plate           String     @unique
+  type            TruckType
+  capacityKg      Float      @map("capacity_kg")
+  preferredCargo  CargoType? @map("preferred_cargo")
+
+  // Documentación opcional (transporte de alimentos / seguro)
+  senasaNumber    String?    @map("senasa_number")
+  insurance       Json?      // { aseguradora, tipo, monto, vencimiento }
+
+  active          Boolean    @default(true)
+
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  bids            Bid[]
+
+  @@map("trucks")
+  @@index([ownerId])
 }
 
 model Trip {
@@ -108,19 +160,29 @@ model Trip {
   originAddress   String    @map("origin_address")
   originLat       Float     @map("origin_lat")
   originLng       Float     @map("origin_lng")
+  originProvince  String?   @map("origin_province")
+  originCity      String?   @map("origin_city")
 
   // Destination
   destAddress     String    @map("dest_address")
   destLat         Float     @map("dest_lat")
   destLng         Float     @map("dest_lng")
+  destProvince    String?   @map("dest_province")
+  destCity        String?   @map("dest_city")
+
+  // Route (calculada al crear la publicación)
+  distanceKm      Float?    @map("distance_km")
+  durationMin     Int?      @map("duration_min")
 
   // Cargo
   cargoType       CargoType @map("cargo_type")
   cargoDesc       String?   @map("cargo_desc")
   weightKg        Float?    @map("weight_kg")
+  volumeDesc      String?   @map("volume_desc")
 
   // Scheduling
   scheduledDate   DateTime  @map("scheduled_date")
+  endDate         DateTime? @map("end_date")
 
   // Pricing
   basePrice       Float     @map("base_price")
@@ -170,11 +232,33 @@ model Bid {
   user            User      @relation(fields: [userId], references: [id])
 
   amount          Float
+  note            String?   // "Aclaración" del transportista al postularse
+  status          BidStatus @default(PENDING)
+
+  truckId         String?   @map("truck_id")
+  truck           Truck?    @relation(fields: [truckId], references: [id])
 
   createdAt       DateTime  @default(now()) @map("created_at")
 
   @@map("bids")
   @@index([auctionId, createdAt(sort: Desc)])
+}
+
+model Notification {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  user            User      @relation(fields: [userId], references: [id])
+
+  type            String    // NEW_BID, BID_ACCEPTED, BID_REJECTED, TRIP_STATE, AUCTION_CLOSED
+  title           String
+  body            String?
+  payload         Json?     // ids de referencia (tripId, auctionId, bidId)
+
+  readAt          DateTime? @map("read_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@map("notifications")
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model Payment {

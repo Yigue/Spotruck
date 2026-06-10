@@ -2,6 +2,8 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
+import { notificationService } from '../services/notificationService.js'
+import { paymentService } from '../services/paymentService.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
 
 const router = Router()
@@ -10,13 +12,21 @@ const createTripSchema = z.object({
   originAddress: z.string().min(1),
   originLat: z.number().min(-90).max(90),
   originLng: z.number().min(-180).max(180),
+  originProvince: z.string().optional(),
+  originCity: z.string().optional(),
   destAddress: z.string().min(1),
   destLat: z.number().min(-90).max(90),
   destLng: z.number().min(-180).max(180),
+  destProvince: z.string().optional(),
+  destCity: z.string().optional(),
+  distanceKm: z.number().positive().optional(),
+  durationMin: z.number().int().positive().optional(),
   cargoType: z.enum(['BULK', 'PALLETS', 'GENERAL', 'REFRIGERATED']),
   cargoDesc: z.string().optional(),
   weightKg: z.number().positive().optional(),
+  volumeDesc: z.string().optional(),
   scheduledDate: z.string().datetime(),
+  endDate: z.string().datetime().optional(),
   basePrice: z.number().positive(),
 })
 
@@ -70,13 +80,16 @@ router.get('/:id', authenticate, async (req, res, next) => {
     const trip = await prisma.trip.findUnique({
       where: { id: req.params.id as string },
       include: {
-        user: { select: { id: true, companyName: true, ratingAvg: true } },
+        user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, companyCuit: true, phone: true } },
         auction: {
           include: {
             bids: {
               orderBy: { createdAt: 'desc' },
               take: 10,
-              include: { user: { select: { id: true, companyName: true, ratingAvg: true } } },
+              include: {
+                user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, phone: true, tripsCompleted: true } },
+                truck: { select: { id: true, plate: true, type: true, capacityKg: true } },
+              },
             },
           },
         },
@@ -96,18 +109,10 @@ router.post('/', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res,
     const data = createTripSchema.parse(req.body)
     const trip = await prisma.trip.create({
       data: {
+        ...data,
         userId: req.user!.sub,
-        originAddress: data.originAddress,
-        originLat: data.originLat,
-        originLng: data.originLng,
-        destAddress: data.destAddress,
-        destLat: data.destLat,
-        destLng: data.destLng,
-        cargoType: data.cargoType,
-        cargoDesc: data.cargoDesc,
-        weightKg: data.weightKg,
         scheduledDate: new Date(data.scheduledDate),
-        basePrice: data.basePrice,
+        endDate: data.endDate ? new Date(data.endDate) : undefined,
       },
     })
     res.status(201).json({ data: trip })
@@ -154,6 +159,114 @@ router.delete('/:id', authenticate, async (req, res, next) => {
 
     await prisma.trip.delete({ where: { id: req.params.id as string } })
     res.json({ data: { success: true } })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── Transiciones de estado del viaje (stepper de la app original) ───────────
+// ASSIGNED (Preparando) → IN_PROGRESS (En viaje) → DELIVERED (Esperando
+// confirmación) → SETTLED (Finalizada). El transportista avanza los dos
+// primeros pasos y la empresa confirma el último.
+
+async function getAssignedDriverId(tripId: string): Promise<string | null> {
+  const acceptedBid = await prisma.bid.findFirst({
+    where: { auction: { tripId }, status: 'ACCEPTED' },
+    select: { userId: true },
+  })
+  return acceptedBid?.userId ?? null
+}
+
+// POST /trips/:id/start — el transportista asignado empieza el viaje
+router.post('/:id/start', authenticate, requireRole('DRIVER'), async (req, res, next) => {
+  try {
+    const trip = await prisma.trip.findUnique({ where: { id: req.params.id as string } })
+    if (!trip) return next(errors.notFound('Trip'))
+    if (trip.status !== 'ASSIGNED') return next(errors.badRequest('Trip must be ASSIGNED to start'))
+
+    const driverId = await getAssignedDriverId(trip.id)
+    if (driverId !== req.user!.sub) return next(errors.forbidden('You are not assigned to this trip'))
+
+    const updated = await prisma.trip.update({ where: { id: trip.id }, data: { status: 'IN_PROGRESS' } })
+
+    await notificationService.createInApp(
+      trip.userId,
+      'TRIP_STATE',
+      'El transportista empezó el viaje',
+      `${trip.originAddress} → ${trip.destAddress}`,
+      { tripId: trip.id, status: 'IN_PROGRESS' }
+    )
+
+    res.json({ data: updated })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /trips/:id/finish — el transportista marca el viaje como terminado
+router.post('/:id/finish', authenticate, requireRole('DRIVER'), async (req, res, next) => {
+  try {
+    const trip = await prisma.trip.findUnique({ where: { id: req.params.id as string } })
+    if (!trip) return next(errors.notFound('Trip'))
+    if (trip.status !== 'IN_PROGRESS') return next(errors.badRequest('Trip must be IN_PROGRESS to finish'))
+
+    const driverId = await getAssignedDriverId(trip.id)
+    if (driverId !== req.user!.sub) return next(errors.forbidden('You are not assigned to this trip'))
+
+    const updated = await prisma.trip.update({ where: { id: trip.id }, data: { status: 'DELIVERED' } })
+
+    await notificationService.createInApp(
+      trip.userId,
+      'TRIP_STATE',
+      'El transportista terminó el viaje',
+      'Confirmá la entrega para finalizar y liberar el pago',
+      { tripId: trip.id, status: 'DELIVERED' }
+    )
+
+    res.json({ data: updated })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /trips/:id/confirm-delivery — la empresa confirma la entrega y se
+// libera el pago al transportista
+router.post('/:id/confirm-delivery', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res, next) => {
+  try {
+    const trip = await prisma.trip.findUnique({ where: { id: req.params.id as string } })
+    if (!trip) return next(errors.notFound('Trip'))
+    if (trip.userId !== req.user!.sub && req.user!.role !== 'ADMIN') {
+      return next(errors.forbidden('Not your trip'))
+    }
+    if (trip.status !== 'DELIVERED') return next(errors.badRequest('Trip must be DELIVERED to confirm'))
+
+    const payment = await prisma.payment.findFirst({
+      where: { tripId: trip.id, status: 'HELD' },
+    })
+    if (payment) {
+      // releasePayment también pasa el viaje a SETTLED
+      await paymentService.releasePayment(payment.id)
+    } else {
+      await prisma.trip.update({ where: { id: trip.id }, data: { status: 'SETTLED' } })
+    }
+
+    const driverId = await getAssignedDriverId(trip.id)
+    if (driverId) {
+      await prisma.user.update({
+        where: { id: driverId },
+        data: { tripsCompleted: { increment: 1 } },
+      })
+      await notificationService.createInApp(
+        driverId,
+        'TRIP_STATE',
+        'La empresa confirmó la entrega',
+        'El viaje finalizó. ¡No te olvides de valorar a la empresa!',
+        { tripId: trip.id, status: 'SETTLED' }
+      )
+    }
+
+    const updated = await prisma.trip.findUnique({ where: { id: trip.id } })
+    res.json({ data: updated })
   } catch (err) {
     next(err)
   }

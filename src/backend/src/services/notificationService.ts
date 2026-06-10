@@ -1,6 +1,19 @@
+import type { Prisma } from '@prisma/client'
 import { prisma } from '../models/prisma.js'
 
 export const notificationService = {
+  async createInApp(
+    userId: string,
+    type: string,
+    title: string,
+    body?: string,
+    payload?: Prisma.InputJsonValue
+  ) {
+    return prisma.notification.create({
+      data: { userId, type, title, body, payload },
+    })
+  },
+
   async sendEmail(to: string, subject: string, _emailBody: string) {
     // Stub for V1 — use console.log
     // TODO: integrate with SendGrid or AWS SES

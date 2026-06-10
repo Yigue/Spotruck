@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
+import { notificationService } from '../services/notificationService.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
 
 const router = Router()
@@ -17,6 +18,8 @@ const createAuctionSchema = z.object({
 
 const bidSchema = z.object({
   amount: z.number().positive(),
+  note: z.string().max(500).optional(),
+  truckId: z.string().uuid().optional(),
 })
 
 // GET /auctions
@@ -60,7 +63,10 @@ router.get('/:id', authenticate, async (req, res, next) => {
         },
         bids: {
           orderBy: { createdAt: 'desc' },
-          include: { user: { select: { id: true, companyName: true, ratingAvg: true } } },
+          include: {
+            user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, phone: true, tripsCompleted: true } },
+            truck: { select: { id: true, plate: true, type: true, capacityKg: true } },
+          },
         },
       },
     })
@@ -107,7 +113,7 @@ router.post('/', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res,
 // POST /auctions/:id/bid
 router.post('/:id/bid', authenticate, requireRole('DRIVER'), async (req, res, next) => {
   try {
-    const { amount } = bidSchema.parse(req.body)
+    const { amount, note, truckId } = bidSchema.parse(req.body)
     const auctionId = req.params.id as string
 
     const auction = await prisma.auction.findUnique({
@@ -121,6 +127,15 @@ router.post('/:id/bid', authenticate, requireRole('DRIVER'), async (req, res, ne
     const minBid = auction.currentPrice * (1 - config.auction.minBidDecrementPercent)
     if (amount >= minBid) return next(errors.badRequest(`Bid must be lower than ${minBid}`))
 
+    if (truckId) {
+      const truck = await prisma.truck.findUnique({ where: { id: truckId } })
+      if (!truck || truck.ownerId !== req.user!.sub) return next(errors.badRequest('Invalid truck'))
+      if (!truck.active) return next(errors.badRequest('Truck is not active'))
+      if (auction.trip.weightKg && truck.capacityKg < auction.trip.weightKg) {
+        return next(errors.badRequest('Truck capacity is below the cargo weight'))
+      }
+    }
+
     // Anti-sniping extension
     const now = new Date()
     const timeLeft = auction.endTime.getTime() - now.getTime()
@@ -132,12 +147,20 @@ router.post('/:id/bid', authenticate, requireRole('DRIVER'), async (req, res, ne
     }
 
     const [bid] = await prisma.$transaction([
-      prisma.bid.create({ data: { auctionId, userId: req.user!.sub, amount } }),
+      prisma.bid.create({ data: { auctionId, userId: req.user!.sub, amount, note, truckId } }),
       prisma.auction.update({
         where: { id: auctionId },
         data: { currentPrice: amount, endTime: newEndTime, extensionCount: { increment: newEndTime > auction.endTime ? 1 : 0 } },
       }),
     ])
+
+    await notificationService.createInApp(
+      auction.trip.userId,
+      'NEW_BID',
+      'Nueva oferta en tu publicación',
+      `Un transportista ofreció ${amount} ARS por ${auction.trip.originAddress} → ${auction.trip.destAddress}`,
+      { tripId: auction.tripId, auctionId, bidId: bid.id }
+    )
 
     res.status(201).json({ data: bid })
   } catch (err) {
@@ -151,7 +174,10 @@ router.get('/:id/bids', authenticate, async (req, res, next) => {
     const bids = await prisma.bid.findMany({
       where: { auctionId: req.params.id as string },
       orderBy: { createdAt: 'desc' },
-      include: { user: { select: { id: true, companyName: true, ratingAvg: true } } },
+      include: {
+        user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, phone: true, tripsCompleted: true } },
+        truck: { select: { id: true, plate: true, type: true, capacityKg: true } },
+      },
     })
     res.json({ data: bids })
   } catch (err) {

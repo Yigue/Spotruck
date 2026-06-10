@@ -150,12 +150,14 @@ POST /auctions/:id/bid
 Authorization: Bearer <accessToken>
 Content-Type: application/json
 
-{ "amount": 45000 }
+{ "amount": 45000, "note": "Tengo factura A", "truckId": "uuid" }
 ```
 
 - **Reverse auction:** bids must be LOWER than current price
 - Anti-sniping: extends auction by 5 min if bid placed in last 5 min
 - Max 3 extensions per auction
+- `note` (optional): aclaración del transportista
+- `truckId` (optional): camión de la flota propia; se valida propiedad, que esté activo y que la capacidad cubra el peso de la carga
 
 **Response `201`:**
 ```json
@@ -165,10 +167,62 @@ Content-Type: application/json
     "auctionId": "uuid",
     "userId": "uuid",
     "amount": 45000,
+    "note": "Tengo factura A",
+    "status": "PENDING",
+    "truckId": "uuid",
     "createdAt": "2026-06-04T..."
   }
 }
 ```
+
+### Accept / Reject Bid (empresa)
+```http
+PATCH /bids/:id
+Authorization: Bearer <accessToken>  (COMPANY dueña del viaje)
+Content-Type: application/json
+
+{ "action": "accept" }
+```
+
+- `accept`: cierra la subasta, rechaza las demás ofertas, asigna el viaje (`ASSIGNED`) y crea el hold de pago
+- `reject`: marca la oferta como `REJECTED` y notifica al transportista
+
+---
+
+## Trip Lifecycle (stepper)
+
+Estados: `ASSIGNED` (Preparando) → `IN_PROGRESS` (En viaje) → `DELIVERED` (Esperando confirmación) → `SETTLED` (Finalizada)
+
+```http
+POST /trips/:id/start             # DRIVER asignado: ASSIGNED → IN_PROGRESS
+POST /trips/:id/finish            # DRIVER asignado: IN_PROGRESS → DELIVERED
+POST /trips/:id/confirm-delivery  # COMPANY dueña: DELIVERED → SETTLED (libera el pago)
+```
+
+---
+
+## Trucks (flota del transportista)
+
+```http
+GET    /trucks        # flota propia (DRIVER)
+POST   /trucks        # { "plate", "type", "capacityKg", "preferredCargo?", "senasaNumber?", "insurance?" }
+PUT    /trucks/:id
+DELETE /trucks/:id    # baja lógica (active=false) si el camión tiene ofertas asociadas
+```
+
+`type`: `JAULA | SEMI | TOLVA | BATEA | FURGON | REFRIGERADO | PLAYO | OTRO`
+
+---
+
+## Notifications
+
+```http
+GET   /notifications            # propias, paginadas; meta incluye "unread"
+PATCH /notifications/:id/read
+POST  /notifications/read-all
+```
+
+`type`: `NEW_BID | BID_ACCEPTED | BID_REJECTED | TRIP_STATE | AUCTION_CLOSED`
 
 ---
 

@@ -33,6 +33,7 @@ export const auctionService = {
 
     let winnerId: string | null = null
     let winningAmount: number | null = null
+    let winningBidId: string | null = null
 
     if (auction.type === 'OPEN' || auction.type === 'SEALED') {
       // Reverse auction: lowest price wins. SEALED also uses lowest.
@@ -43,6 +44,7 @@ export const auctionService = {
         } else {
           winnerId = winningBid.userId
           winningAmount = winningBid.amount
+          winningBidId = winningBid.id
         }
       }
     } else if (auction.type === 'DUTCH') {
@@ -51,7 +53,18 @@ export const auctionService = {
       if (winningBid) {
         winnerId = winningBid.userId
         winningAmount = winningBid.amount
+        winningBidId = winningBid.id
       }
+    }
+
+    if (winningBidId) {
+      await prisma.$transaction([
+        prisma.bid.update({ where: { id: winningBidId }, data: { status: 'ACCEPTED' } }),
+        prisma.bid.updateMany({
+          where: { auctionId, id: { not: winningBidId }, status: 'PENDING' },
+          data: { status: 'REJECTED' },
+        }),
+      ])
     }
 
     if (winnerId && winningAmount !== null) {

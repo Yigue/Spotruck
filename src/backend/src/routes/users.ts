@@ -13,8 +13,11 @@ router.get('/me', authenticate, async (req, res) => {
       id: true, email: true, role: true, companyName: true,
       companyCuit: true, phone: true, driverLicense: true,
       vehiclePlate: true, vehicleType: true, vehicleCapacity: true,
+      preferredZone: true, emailVerified: true, address: true,
+      website: true, sector: true,
       ratingAvg: true, ratingCount: true, tripsCompleted: true,
       trustScore: true, createdAt: true,
+      trucks: { where: { active: true } },
     },
   })
   if (!user) {
@@ -32,6 +35,10 @@ const updateUserSchema = z.object({
   vehiclePlate: z.string().optional(),
   vehicleType: z.string().optional(),
   vehicleCapacity: z.number().optional(),
+  preferredZone: z.string().optional(),
+  address: z.string().optional(),
+  website: z.string().optional(),
+  sector: z.string().optional(),
 })
 
 router.put('/me', authenticate, async (req, res, next) => {
@@ -54,9 +61,14 @@ router.get('/:id/profile', authenticate, async (req, res, next) => {
     const user = await prisma.user.findUnique({
       where: { id },
       select: {
-        id: true, role: true, companyName: true,
+        id: true, role: true, companyName: true, companyCuit: true,
+        phone: true, address: true, website: true, sector: true,
         ratingAvg: true, ratingCount: true,
         tripsCompleted: true, trustScore: true, createdAt: true,
+        trucks: {
+          where: { active: true },
+          select: { id: true, plate: true, type: true, capacityKg: true, preferredCargo: true },
+        },
       },
     })
     if (!user) return next(errors.notFound('User'))
