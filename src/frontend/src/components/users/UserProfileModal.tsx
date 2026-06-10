@@ -14,6 +14,7 @@ interface PublicProfile {
   address?: string
   website?: string
   sector?: string
+  documentsStatus?: string
   ratingAvg: number
   ratingCount: number
   tripsCompleted: number
@@ -59,7 +60,14 @@ export function UserProfileModal({ userId, onClose }: UserProfileModalProps) {
           <div className="flex items-center gap-3">
             <Avatar name={profile.companyName} size="lg" />
             <div className="flex-1">
-              <p className="font-bold">{profile.companyName || 'Usuario'}</p>
+              <p className="font-bold">
+                {profile.companyName || 'Usuario'}
+                {profile.documentsStatus === 'APPROVED' && (
+                  <span className="ml-2 text-xs bg-success/10 text-success px-2 py-0.5 rounded-full align-middle">
+                    ✓ Verificado
+                  </span>
+                )}
+              </p>
               <Stars avg={profile.ratingAvg} count={profile.ratingCount} />
             </div>
             {profile.phone && (

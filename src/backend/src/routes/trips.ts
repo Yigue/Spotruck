@@ -88,7 +88,7 @@ router.get('/:id', authenticate, async (req, res, next) => {
               orderBy: { createdAt: 'desc' },
               take: 10,
               include: {
-                user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, phone: true, tripsCompleted: true } },
+                user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, phone: true, tripsCompleted: true, documentsStatus: true } },
                 truck: { select: { id: true, plate: true, type: true, capacityKg: true } },
               },
             },

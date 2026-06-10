@@ -222,7 +222,32 @@ PATCH /notifications/:id/read
 POST  /notifications/read-all
 ```
 
-`type`: `NEW_BID | BID_ACCEPTED | BID_REJECTED | TRIP_STATE | AUCTION_CLOSED`
+`type`: `NEW_BID | BID_ACCEPTED | BID_REJECTED | TRIP_STATE | AUCTION_CLOSED | PAYMENT_PENDING | PAYMENT_HELD | DOCUMENTS_REVIEWED`
+
+---
+
+## Verificación de transportistas (revisión admin)
+
+```http
+POST  /users/me/request-verification   (DRIVER) requiere licencia + ≥1 camión cargado
+GET   /users?role=DRIVER&documentsStatus=PENDING   (ADMIN) lista pendientes
+PATCH /users/:id/verify                (ADMIN) { "action": "approve" | "reject", "note?" }
+```
+
+`documentsStatus`: `NONE → PENDING → APPROVED | REJECTED`. Los perfiles
+con `APPROVED` muestran la insignia "✓ Verificado".
+
+---
+
+## Stats
+
+```http
+GET /stats/me        # estadísticas de los últimos 6 meses según el rol
+```
+
+- **COMPANY**: publicaciones y gasto por mes, distribución por tipo de carga, KPIs
+- **DRIVER**: ingresos netos por mes, ofertas por estado, tasa de aceptación, KPIs
+- Ambos: distribución de valoraciones recibidas
 
 ---
 

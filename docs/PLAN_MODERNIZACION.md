@@ -181,6 +181,11 @@ model Notification {
 
 ## 5. Plan por Fases
 
+> **Estado (2026-06-10):** Fases 0, 1, 2, 3 y 4 (núcleo) ✅ implementadas en
+> `claude/optimistic-fermat-f62yt2`. Pendiente del usuario: credenciales en
+> `.env` (MercadoPago + Resend, ver `.env.example`). Backlog restante de
+> Fase 4: i18n, pricing ML, apps nativas, integraciones B2B.
+
 ### Fase 0 — Modelo de datos (1 semana)
 - Migraciones Prisma: `Truck`, `Bid.note/status/truckId`, campos nuevos de `Trip` y `User`, `Notification`.
 - Endpoints: CRUD `/trucks`, `PATCH /bids/:id` (accept/reject con cierre de subasta y asignación), transiciones de estado del viaje con doble confirmación.

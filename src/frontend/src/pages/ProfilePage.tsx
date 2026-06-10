@@ -24,6 +24,7 @@ interface Me {
   id: string
   email: string
   emailVerified?: boolean
+  documentsStatus?: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED'
   role: 'COMPANY' | 'DRIVER' | 'ADMIN'
   companyName?: string
   companyCuit?: string
@@ -256,6 +257,52 @@ export default function ProfilePage() {
           </Button>
         </form>
       </Card>
+
+      {isDriver && (
+        <Card>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-lg font-bold">Verificación de cuenta</h2>
+              <p className="text-sm text-text-muted">
+                {me.documentsStatus === 'APPROVED' &&
+                  'Tu cuenta está verificada: las empresas ven la insignia ✓ en tu perfil'}
+                {me.documentsStatus === 'PENDING' &&
+                  'Tu documentación está en revisión por el equipo de Spottruck'}
+                {me.documentsStatus === 'REJECTED' &&
+                  'Tu documentación fue rechazada. Revisá tus datos y volvé a solicitarla'}
+                {(!me.documentsStatus || me.documentsStatus === 'NONE') &&
+                  'Cargá tu licencia y al menos un camión, y solicitá la verificación'}
+              </p>
+            </div>
+            {me.documentsStatus === 'APPROVED' ? (
+              <Badge variant="success">✓ Verificado</Badge>
+            ) : me.documentsStatus === 'PENDING' ? (
+              <Badge variant="info">En revisión</Badge>
+            ) : (
+              <Button
+                size="sm"
+                variant="accent"
+                onClick={() =>
+                  api
+                    .post('/users/me/request-verification')
+                    .then(() => {
+                      toast.success('Solicitud enviada, te avisamos cuando esté revisada')
+                      loadMe()
+                    })
+                    .catch((err) =>
+                      toast.error(
+                        (err as { response?: { data?: { error?: { message?: string } } } })
+                          ?.response?.data?.error?.message || 'No se pudo enviar la solicitud'
+                      )
+                    )
+                }
+              >
+                Solicitar verificación
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
 
       {isDriver && (
         <Card>

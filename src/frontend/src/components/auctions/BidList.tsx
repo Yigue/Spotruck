@@ -16,6 +16,7 @@ export interface BidWithDetails {
     ratingCount?: number
     phone?: string
     tripsCompleted?: number
+    documentsStatus?: string
   }
   truck?: { id: string; plate: string; type: string; capacityKg: number } | null
 }

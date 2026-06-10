@@ -30,9 +30,15 @@ function timeAgo(date: string) {
   return `hace ${Math.floor(h / 24)} d`
 }
 
+interface NotificationBellProps {
+  // compact: solo el ícono (header mobile). direction: hacia dónde abre el panel
+  compact?: boolean
+  direction?: 'up' | 'down'
+}
+
 // Campanita de notificaciones in-app: contador de no leídas, panel
 // desplegable y actualización en tiempo real por WebSocket
-export function NotificationBell() {
+export function NotificationBell({ compact = false, direction = 'up' }: NotificationBellProps) {
   const navigate = useNavigate()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unread, setUnread] = useState(0)
@@ -110,7 +116,7 @@ export function NotificationBell() {
         aria-label="Notificaciones"
       >
         <span className="text-lg">🔔</span>
-        Notificaciones
+        {!compact && 'Notificaciones'}
         {unread > 0 && (
           <span className="absolute -top-2 left-3 bg-error text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
             {unread > 9 ? '9+' : unread}
@@ -119,7 +125,11 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-0 mb-2 w-80 bg-surface text-text rounded-lg shadow-lg border border-secondary-500/20 z-50">
+        <div
+          className={`absolute w-80 max-w-[calc(100vw-2rem)] bg-surface text-text rounded-lg shadow-lg border border-secondary-500/20 z-50 ${
+            direction === 'up' ? 'bottom-full left-0 mb-2' : 'top-full right-0 mt-2'
+          }`}
+        >
           <div className="flex items-center justify-between p-3 border-b border-secondary-500/10">
             <span className="font-semibold text-sm">Notificaciones</span>
             {unread > 0 && (

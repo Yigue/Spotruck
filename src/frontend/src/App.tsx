@@ -10,6 +10,7 @@ import NewTripPage from './pages/NewTripPage'
 import AuctionPage from './pages/AuctionPage'
 import ExplorePage from './pages/ExplorePage'
 import ProfilePage from './pages/ProfilePage'
+import StatsPage from './pages/StatsPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import Layout from './components/Layout'
 
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="auctions" element={<AuctionPage />} />
           <Route path="auctions/:id" element={<AuctionPage />} />
           <Route path="explore" element={<ExplorePage />} />
+          <Route path="stats" element={<StatsPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

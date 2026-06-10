@@ -20,6 +20,16 @@ async function main() {
   const passwordHash = await bcrypt.hash('Demo1234!', 12)
 
   // ─── Users ──────────────────────────────────────────────────────────────────
+  await prisma.user.create({
+    data: {
+      email: 'admin@spottruck.com',
+      passwordHash,
+      role: 'ADMIN',
+      companyName: 'Spottruck Admin',
+      emailVerified: true,
+    },
+  })
+
   const company = await prisma.user.create({
     data: {
       email: 'empresa@demo.com',
@@ -49,6 +59,7 @@ async function main() {
       vehiclePlate: 'AB 123 CD',
       vehicleType: 'SEMIREMOLQUE',
       vehicleCapacity: 25000,
+      documentsStatus: 'APPROVED', // transportista verificado de ejemplo
     },
   })
 

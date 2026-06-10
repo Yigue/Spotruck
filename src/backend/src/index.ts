@@ -15,6 +15,7 @@ import { trackingRouter } from './routes/tracking.js'
 import { trucksRouter } from './routes/trucks.js'
 import { bidsRouter } from './routes/bids.js'
 import { notificationsRouter } from './routes/notifications.js'
+import { statsRouter } from './routes/stats.js'
 import { setupWebSocket } from './websocket/index.js'
 
 const app = express()
@@ -41,6 +42,7 @@ app.use('/api/v1/tracking', trackingRouter)
 app.use('/api/v1/trucks', trucksRouter)
 app.use('/api/v1/bids', bidsRouter)
 app.use('/api/v1/notifications', notificationsRouter)
+app.use('/api/v1/stats', statsRouter)
 
 // 404
 app.use((_, res) => res.status(404).json({ error: 'Not found' }))

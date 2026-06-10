@@ -2,9 +2,82 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
+import { notificationService } from '../services/notificationService.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
 
 const router = Router()
+
+// POST /users/me/request-verification — el transportista pide la revisión
+// de su documentación (licencia + camiones cargados)
+router.post('/me/request-verification', authenticate, requireRole('DRIVER'), async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.sub },
+      include: { _count: { select: { trucks: true } } },
+    })
+    if (!user) return next(errors.notFound('User'))
+    if (user.documentsStatus === 'APPROVED') {
+      return next(errors.badRequest('Tu documentación ya está aprobada'))
+    }
+    if (user.documentsStatus === 'PENDING') {
+      return next(errors.badRequest('Ya hay una revisión en curso'))
+    }
+    if (!user.driverLicense) {
+      return next(errors.badRequest('Cargá tu licencia de conducir en el perfil antes de solicitar la verificación'))
+    }
+    if (user._count.trucks === 0) {
+      return next(errors.badRequest('Cargá al menos un camión antes de solicitar la verificación'))
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: { documentsStatus: 'PENDING' },
+      select: { id: true, documentsStatus: true },
+    })
+
+    res.json({ data: updated })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// PATCH /users/:id/verify — el admin aprueba o rechaza la documentación
+router.patch('/:id/verify', authenticate, requireRole('ADMIN'), async (req, res, next) => {
+  try {
+    const { action, note } = z
+      .object({ action: z.enum(['approve', 'reject']), note: z.string().max(500).optional() })
+      .parse(req.body)
+
+    const user = await prisma.user.findUnique({ where: { id: req.params.id as string } })
+    if (!user) return next(errors.notFound('User'))
+    if (user.documentsStatus !== 'PENDING') {
+      return next(errors.badRequest('User has no pending verification'))
+    }
+
+    const documentsStatus = action === 'approve' ? 'APPROVED' : 'REJECTED'
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: { documentsStatus },
+      select: { id: true, documentsStatus: true },
+    })
+
+    await notificationService.createInApp(
+      user.id,
+      'DOCUMENTS_REVIEWED',
+      action === 'approve'
+        ? '✓ Tu cuenta fue verificada'
+        : 'Tu documentación fue rechazada',
+      action === 'approve'
+        ? 'Tu perfil ahora muestra la insignia de transportista verificado'
+        : note || 'Revisá tus datos y volvé a solicitar la verificación',
+      { documentsStatus }
+    )
+
+    res.json({ data: updated })
+  } catch (err) {
+    next(err)
+  }
+})
 
 router.get('/me', authenticate, async (req, res) => {
   const user = await prisma.user.findUnique({
@@ -13,8 +86,8 @@ router.get('/me', authenticate, async (req, res) => {
       id: true, email: true, role: true, companyName: true,
       companyCuit: true, phone: true, driverLicense: true,
       vehiclePlate: true, vehicleType: true, vehicleCapacity: true,
-      preferredZone: true, emailVerified: true, address: true,
-      website: true, sector: true,
+      preferredZone: true, emailVerified: true, documentsStatus: true,
+      address: true, website: true, sector: true,
       ratingAvg: true, ratingCount: true, tripsCompleted: true,
       trustScore: true, createdAt: true,
       trucks: { where: { active: true } },
@@ -63,6 +136,7 @@ router.get('/:id/profile', authenticate, async (req, res, next) => {
       select: {
         id: true, role: true, companyName: true, companyCuit: true,
         phone: true, address: true, website: true, sector: true,
+        documentsStatus: true,
         ratingAvg: true, ratingCount: true,
         tripsCompleted: true, trustScore: true, createdAt: true,
         trucks: {
@@ -80,12 +154,14 @@ router.get('/:id/profile', authenticate, async (req, res, next) => {
 
 router.get('/', authenticate, requireRole('ADMIN'), async (req, res, next) => {
   try {
-    const { page = '1', limit = '20', role } = req.query
-    const where = role ? { role: role as 'COMPANY' | 'DRIVER' | 'ADMIN' } : {}
+    const { page = '1', limit = '20', role, documentsStatus } = req.query
+    const where: Record<string, unknown> = {}
+    if (role) where.role = role as 'COMPANY' | 'DRIVER' | 'ADMIN'
+    if (documentsStatus) where.documentsStatus = documentsStatus
     const skip = (Number(page) - 1) * Number(limit)
     const take = Number(limit)
     const [users, total] = await Promise.all([
-      prisma.user.findMany({ where, skip, take, select: { id: true, email: true, role: true, ratingAvg: true, tripsCompleted: true, createdAt: true } }),
+      prisma.user.findMany({ where, skip, take, select: { id: true, email: true, role: true, companyName: true, driverLicense: true, documentsStatus: true, ratingAvg: true, tripsCompleted: true, createdAt: true } }),
       prisma.user.count({ where }),
     ])
     res.json({ data: users, meta: { total, page: Number(page), limit } })

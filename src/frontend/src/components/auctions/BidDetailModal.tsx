@@ -59,7 +59,14 @@ export function BidDetailModal({ bid, canDecide, onClose, onDecided }: BidDetail
           <div className="flex items-center gap-3">
             <Avatar name={bid.user.companyName} size="lg" />
             <div className="flex-1">
-              <p className="font-bold">{bid.user.companyName || 'Transportista'}</p>
+              <p className="font-bold">
+                {bid.user.companyName || 'Transportista'}
+                {bid.user.documentsStatus === 'APPROVED' && (
+                  <span className="ml-2 text-xs bg-success/10 text-success px-2 py-0.5 rounded-full align-middle">
+                    ✓ Verificado
+                  </span>
+                )}
+              </p>
               <Stars avg={bid.user.ratingAvg} count={bid.user.ratingCount ?? 0} />
             </div>
             {bid.user.phone && (

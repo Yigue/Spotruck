@@ -65,7 +65,7 @@ router.get('/:id', authenticate, async (req, res, next) => {
         bids: {
           orderBy: { createdAt: 'desc' },
           include: {
-            user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, phone: true, tripsCompleted: true } },
+            user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, phone: true, tripsCompleted: true, documentsStatus: true } },
             truck: { select: { id: true, plate: true, type: true, capacityKg: true } },
           },
         },
@@ -178,7 +178,7 @@ router.get('/:id/bids', authenticate, async (req, res, next) => {
       where: { auctionId: req.params.id as string },
       orderBy: { createdAt: 'desc' },
       include: {
-        user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, phone: true, tripsCompleted: true } },
+        user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, phone: true, tripsCompleted: true, documentsStatus: true } },
         truck: { select: { id: true, plate: true, type: true, capacityKg: true } },
       },
     })

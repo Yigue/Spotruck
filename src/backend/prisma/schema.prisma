@@ -78,6 +78,13 @@ enum BidStatus {
   WITHDRAWN
 }
 
+enum DocumentsStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -103,6 +110,8 @@ model User {
   // Profile
   emailVerified  Boolean  @default(false) @map("email_verified")
   emailVerifyToken String? @unique @map("email_verify_token")
+  // Revisión de documentación del transportista (licencia, cédula, seguro)
+  documentsStatus DocumentsStatus @default(NONE) @map("documents_status")
   address        String?
   website        String?
   sector         String?
