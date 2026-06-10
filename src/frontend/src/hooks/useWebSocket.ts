@@ -8,8 +8,8 @@ interface WSMessage {
 
 export function useWebSocket(onMessage: (msg: WSMessage) => void) {
   const wsRef = useRef<WebSocket | null>(null)
-  const { token, user } = useAuthStore()
-  const authToken = token || user?.accessToken
+  const { token } = useAuthStore()
+  const authToken = token
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout>>()
 
   const connect = useCallback(() => {

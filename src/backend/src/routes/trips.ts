@@ -94,6 +94,7 @@ router.get('/:id', authenticate, async (req, res, next) => {
           },
         },
         trackingLogs: { orderBy: { recordedAt: 'desc' }, take: 100 },
+        ratings: { select: { fromUserId: true, toUserId: true, score: true } },
       },
     })
     if (!trip) return next(errors.notFound('Trip'))

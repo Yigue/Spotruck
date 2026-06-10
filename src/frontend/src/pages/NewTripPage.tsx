@@ -1,43 +1,154 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
 import api from '../utils/api'
 import toast from 'react-hot-toast'
 import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import {
+  fetchProvinces,
+  fetchLocalities,
+  fetchRoute,
+  formatDuration,
+  type Province,
+  type Locality,
+  type RouteInfo,
+} from '../utils/geo'
 
 const cargoTypeOptions = [
   { value: 'GENERAL', label: 'General' },
   { value: 'BULK', label: 'Granel' },
-  { value: 'PALLETS', label: 'Pallets' },
+  { value: 'PALLETS', label: 'Unitarizada (Pallets)' },
   { value: 'REFRIGERATED', label: 'Refrigerada' },
 ]
 
+const originIcon = L.icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  shadowSize: [41, 41],
+})
+
+const destIcon = L.icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  shadowSize: [41, 41],
+})
+
+interface PlaceSelection {
+  provinceId: string
+  provinceName: string
+  locality: Locality | null
+}
+
+const emptyPlace: PlaceSelection = { provinceId: '', provinceName: '', locality: null }
+
+function PlaceSelector({
+  label,
+  provinces,
+  value,
+  onChange,
+}: {
+  label: string
+  provinces: Province[]
+  value: PlaceSelection
+  onChange: (p: PlaceSelection) => void
+}) {
+  const [localities, setLocalities] = useState<Locality[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!value.provinceId) {
+      setLocalities([])
+      return
+    }
+    setLoading(true)
+    fetchLocalities(value.provinceId)
+      .then(setLocalities)
+      .catch(() => setLocalities([]))
+      .finally(() => setLoading(false))
+  }, [value.provinceId])
+
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <Select
+        label={`Provincia ${label}`}
+        options={[
+          { value: '', label: 'Seleccionar…' },
+          ...provinces.map((p) => ({ value: p.id, label: p.nombre })),
+        ]}
+        value={value.provinceId}
+        onChange={(e) => {
+          const province = provinces.find((p) => p.id === e.target.value)
+          onChange({
+            provinceId: e.target.value,
+            provinceName: province?.nombre ?? '',
+            locality: null,
+          })
+        }}
+      />
+      <Select
+        label={`Localidad ${label}`}
+        options={[
+          { value: '', label: loading ? 'Cargando…' : 'Seleccionar…' },
+          ...localities.map((l) => ({ value: l.id, label: l.nombre })),
+        ]}
+        value={value.locality?.id ?? ''}
+        disabled={!value.provinceId || loading}
+        onChange={(e) => {
+          const locality = localities.find((l) => l.id === e.target.value) ?? null
+          onChange({ ...value, locality })
+        }}
+      />
+    </div>
+  )
+}
+
 export default function NewTripPage() {
   const navigate = useNavigate()
+  const [provinces, setProvinces] = useState<Province[]>([])
+  const [origin, setOrigin] = useState<PlaceSelection>(emptyPlace)
+  const [dest, setDest] = useState<PlaceSelection>(emptyPlace)
+  const [route, setRoute] = useState<RouteInfo | null>(null)
   const [form, setForm] = useState({
-    originAddress: '',
-    originLat: '',
-    originLng: '',
-    destAddress: '',
-    destLat: '',
-    destLng: '',
     cargoType: 'GENERAL',
     cargoDesc: '',
     weightKg: '',
+    volumeDesc: '',
     scheduledDate: '',
+    endDate: '',
     basePrice: '',
   })
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    fetchProvinces()
+      .then(setProvinces)
+      .catch(() => toast.error('No se pudo cargar el listado de provincias'))
+  }, [])
+
+  // Calcula la ruta (distancia y duración) cuando origen y destino están elegidos
+  useEffect(() => {
+    setRoute(null)
+    if (!origin.locality || !dest.locality) return
+    const o = origin.locality.centroide
+    const d = dest.locality.centroide
+    fetchRoute({ lat: o.lat, lng: o.lon }, { lat: d.lat, lng: d.lon }).then(setRoute)
+  }, [origin.locality, dest.locality])
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target
     setForm((f) => ({ ...f, [name]: value }))
-    // Clear error when field is modified
     if (errors[name]) {
       setErrors((e) => {
         const newErrors = { ...e }
@@ -47,139 +158,148 @@ export default function NewTripPage() {
     }
   }
 
+  const mapCenter = useMemo<[number, number]>(() => {
+    if (origin.locality && dest.locality) {
+      return [
+        (origin.locality.centroide.lat + dest.locality.centroide.lat) / 2,
+        (origin.locality.centroide.lon + dest.locality.centroide.lon) / 2,
+      ]
+    }
+    return [-34.6, -60.0]
+  }, [origin.locality, dest.locality])
+
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
-
-    if (!form.originAddress.trim()) newErrors.originAddress = 'Requerido'
-    if (!form.destAddress.trim()) newErrors.destAddress = 'Requerido'
-    if (!form.originLat || isNaN(parseFloat(form.originLat)))
-      newErrors.originLat = 'Latitud inválida'
-    if (!form.originLng || isNaN(parseFloat(form.originLng)))
-      newErrors.originLng = 'Longitud inválida'
-    if (!form.destLat || isNaN(parseFloat(form.destLat)))
-      newErrors.destLat = 'Latitud inválida'
-    if (!form.destLng || isNaN(parseFloat(form.destLng)))
-      newErrors.destLng = 'Longitud inválida'
+    if (!origin.locality) newErrors.origin = 'Seleccioná provincia y localidad de origen'
+    if (!dest.locality) newErrors.dest = 'Seleccioná provincia y localidad de destino'
     if (!form.scheduledDate) newErrors.scheduledDate = 'Requerido'
-    if (!form.basePrice || parseFloat(form.basePrice) <= 0)
-      newErrors.basePrice = 'Precio inválido'
-
+    if (form.endDate && form.scheduledDate && form.endDate < form.scheduledDate)
+      newErrors.endDate = 'Debe ser posterior a la fecha de inicio'
+    if (!form.basePrice || parseFloat(form.basePrice) <= 0) newErrors.basePrice = 'Precio inválido'
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (!validate()) return
+    if (!validate() || !origin.locality || !dest.locality) return
 
     setLoading(true)
     try {
       const payload = {
-        originAddress: form.originAddress,
-        originLat: parseFloat(form.originLat),
-        originLng: parseFloat(form.originLng),
-        destAddress: form.destAddress,
-        destLat: parseFloat(form.destLat),
-        destLng: parseFloat(form.destLng),
+        originAddress: `${origin.locality.nombre}, ${origin.provinceName}`,
+        originLat: origin.locality.centroide.lat,
+        originLng: origin.locality.centroide.lon,
+        originProvince: origin.provinceName,
+        originCity: origin.locality.nombre,
+        destAddress: `${dest.locality.nombre}, ${dest.provinceName}`,
+        destLat: dest.locality.centroide.lat,
+        destLng: dest.locality.centroide.lon,
+        destProvince: dest.provinceName,
+        destCity: dest.locality.nombre,
+        distanceKm: route?.distanceKm,
+        durationMin: route?.durationMin,
         cargoType: form.cargoType,
         cargoDesc: form.cargoDesc || undefined,
         weightKg: form.weightKg ? parseFloat(form.weightKg) : undefined,
-        scheduledDate: form.scheduledDate,
+        volumeDesc: form.volumeDesc || undefined,
+        scheduledDate: new Date(form.scheduledDate).toISOString(),
+        endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
         basePrice: parseFloat(form.basePrice),
       }
 
       const { data } = await api.post('/trips', payload)
-      toast.success('Viaje creado')
+      toast.success('Publicación creada')
       navigate(`/trips/${data.data.id}`)
     } catch {
-      toast.error('Error al crear viaje')
+      toast.error('Error al crear la publicación')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">Publicar nuevo viaje</h1>
+    <div className="max-w-3xl space-y-6">
+      <h1 className="text-2xl font-bold">Publicar nuevo viaje</h1>
 
       <Card>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Origin Address */}
-          <Input
-            label="Dirección de origen"
-            name="originAddress"
-            value={form.originAddress}
-            onChange={handleChange}
-            error={errors.originAddress}
-            required
-            placeholder="Ej: Av. Corrientes 1000, Buenos Aires"
-          />
+          <PlaceSelector label="origen" provinces={provinces} value={origin} onChange={setOrigin} />
+          {errors.origin && <p className="text-xs text-error">{errors.origin}</p>}
 
-          {/* Origin Coordinates */}
+          <PlaceSelector label="destino" provinces={provinces} value={dest} onChange={setDest} />
+          {errors.dest && <p className="text-xs text-error">{errors.dest}</p>}
+
+          {/* Mapa con la ruta */}
+          {(origin.locality || dest.locality) && (
+            <div className="rounded-lg overflow-hidden border border-secondary-500/20">
+              <MapContainer
+                key={`${origin.locality?.id}-${dest.locality?.id}`}
+                center={mapCenter}
+                zoom={origin.locality && dest.locality ? 6 : 7}
+                className="w-full h-64"
+                scrollWheelZoom={false}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {origin.locality && (
+                  <Marker
+                    position={[origin.locality.centroide.lat, origin.locality.centroide.lon]}
+                    icon={originIcon}
+                  >
+                    <Popup>{origin.locality.nombre}</Popup>
+                  </Marker>
+                )}
+                {dest.locality && (
+                  <Marker
+                    position={[dest.locality.centroide.lat, dest.locality.centroide.lon]}
+                    icon={destIcon}
+                  >
+                    <Popup>{dest.locality.nombre}</Popup>
+                  </Marker>
+                )}
+                {route && <Polyline positions={route.geometry} color="#1B5E20" />}
+              </MapContainer>
+            </div>
+          )}
+
+          {route && (
+            <div className="flex gap-6 text-sm bg-background rounded p-3">
+              <div>
+                <span className="text-text-muted">Distancia: </span>
+                <span className="font-semibold">{route.distanceKm} km</span>
+              </div>
+              <div>
+                <span className="text-text-muted">Duración del viaje: </span>
+                <span className="font-semibold">{formatDuration(route.durationMin)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Fechas */}
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Latitud origen"
-              name="originLat"
-              type="number"
-              step="any"
-              value={form.originLat}
+              label="Fecha de inicio"
+              name="scheduledDate"
+              type="datetime-local"
+              value={form.scheduledDate}
               onChange={handleChange}
-              error={errors.originLat}
+              error={errors.scheduledDate}
               required
-              placeholder="-34.6037"
             />
             <Input
-              label="Longitud origen"
-              name="originLng"
-              type="number"
-              step="any"
-              value={form.originLng}
+              label="Fecha fin (vencimiento de la publicación)"
+              name="endDate"
+              type="datetime-local"
+              value={form.endDate}
               onChange={handleChange}
-              error={errors.originLng}
-              required
-              placeholder="-58.3816"
+              error={errors.endDate}
             />
           </div>
 
-          {/* Destination Address */}
-          <Input
-            label="Dirección de destino"
-            name="destAddress"
-            value={form.destAddress}
-            onChange={handleChange}
-            error={errors.destAddress}
-            required
-            placeholder="Ej: San Martín 500, Rosario"
-          />
-
-          {/* Destination Coordinates */}
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Latitud destino"
-              name="destLat"
-              type="number"
-              step="any"
-              value={form.destLat}
-              onChange={handleChange}
-              error={errors.destLat}
-              required
-              placeholder="-34.6037"
-            />
-            <Input
-              label="Longitud destino"
-              name="destLng"
-              type="number"
-              step="any"
-              value={form.destLng}
-              onChange={handleChange}
-              error={errors.destLng}
-              required
-              placeholder="-58.3816"
-            />
-          </div>
-
-          {/* Cargo Type and Weight */}
+          {/* Carga */}
           <div className="grid grid-cols-2 gap-4">
             <Select
               label="Tipo de carga"
@@ -189,16 +309,23 @@ export default function NewTripPage() {
               onChange={handleChange}
             />
             <Input
-              label="Peso (kg)"
+              label="Peso del cargamento (kg)"
               name="weightKg"
               type="number"
               value={form.weightKg}
               onChange={handleChange}
-              placeholder="Opcional"
+              placeholder="Ej: 25000"
             />
           </div>
 
-          {/* Cargo Description */}
+          <Input
+            label="Volumen del cargamento"
+            name="volumeDesc"
+            value={form.volumeDesc}
+            onChange={handleChange}
+            placeholder="Ej: Maíz a granel"
+          />
+
           <div className="space-y-1">
             <label className="label">Descripción de la carga</label>
             <textarea
@@ -211,30 +338,17 @@ export default function NewTripPage() {
             />
           </div>
 
-          {/* Scheduled Date and Base Price */}
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Fecha de viaje"
-              name="scheduledDate"
-              type="datetime-local"
-              value={form.scheduledDate}
-              onChange={handleChange}
-              error={errors.scheduledDate}
-              required
-            />
-            <Input
-              label="Precio base (ARS)"
-              name="basePrice"
-              type="number"
-              value={form.basePrice}
-              onChange={handleChange}
-              error={errors.basePrice}
-              required
-              placeholder="Ej: 45000"
-            />
-          </div>
+          <Input
+            label="Precio base (ARS)"
+            name="basePrice"
+            type="number"
+            value={form.basePrice}
+            onChange={handleChange}
+            error={errors.basePrice}
+            required
+            placeholder="Ej: 45000"
+          />
 
-          {/* Actions */}
           <div className="flex gap-3 pt-4">
             <Button type="submit" variant="accent" loading={loading}>
               Publicar viaje

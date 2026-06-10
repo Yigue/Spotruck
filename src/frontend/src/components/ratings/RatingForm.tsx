@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '../ui/Button'
-import { Card } from '../ui/Card'
 import api from '../../utils/api'
 import toast from 'react-hot-toast'
 

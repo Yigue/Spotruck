@@ -8,6 +8,8 @@ import TripsPage from './pages/TripsPage'
 import TripDetailPage from './pages/TripDetailPage'
 import NewTripPage from './pages/NewTripPage'
 import AuctionPage from './pages/AuctionPage'
+import ExplorePage from './pages/ExplorePage'
+import ProfilePage from './pages/ProfilePage'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -30,6 +32,8 @@ export default function App() {
           <Route path="trips/:id" element={<TripDetailPage />} />
           <Route path="auctions" element={<AuctionPage />} />
           <Route path="auctions/:id" element={<AuctionPage />} />
+          <Route path="explore" element={<ExplorePage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

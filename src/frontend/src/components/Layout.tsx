@@ -1,15 +1,20 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../hooks/useAuthStore'
 
-const navItems = [
+const navItems: { to: string; label: string; icon: string; driverOnly?: boolean }[] = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
   { to: '/trips', label: 'Viajes', icon: '🚚' },
   { to: '/auctions', label: 'Subastas', icon: '🔨' },
+  { to: '/explore', label: 'Explorar', icon: '🗺️', driverOnly: true },
+  { to: '/profile', label: 'Mi perfil', icon: '👤' },
 ]
 
 export default function Layout() {
   const { user, logout } = useAuthStore()
   const location = useLocation()
+  const visibleNavItems = navItems.filter(
+    (item) => !item.driverOnly || user?.role === 'DRIVER'
+  )
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -20,7 +25,7 @@ export default function Layout() {
           <p className="text-xs text-secondary-500 mt-1">Plataforma de Fletes</p>
         </div>
         <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <Link
               key={item.to}
               to={item.to}

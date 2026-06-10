@@ -36,7 +36,7 @@ export default function DashboardPage() {
   })
   const [recentTrips, setRecentTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {

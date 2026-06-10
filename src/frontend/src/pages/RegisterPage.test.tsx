@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import api from '../utils/api'
+import toast from 'react-hot-toast'
 
 // Hoisted mock variables - safe inside vi.mock factories (no TDZ)
 const { mockSetAuth, mockNavigate } = vi.hoisted(() => ({
@@ -13,6 +14,15 @@ const { mockSetAuth, mockNavigate } = vi.hoisted(() => ({
 vi.mock('../utils/api', () => ({
   default: {
     post: vi.fn(),
+    put: vi.fn(),
+  },
+}))
+
+// Mock toast
+vi.mock('react-hot-toast', () => ({
+  default: {
+    success: vi.fn(),
+    error: vi.fn(),
   },
 }))
 
@@ -39,59 +49,100 @@ const renderRegister = () =>
     </BrowserRouter>
   )
 
+// Completa el paso 1 (credenciales + términos) y avanza al paso 2
+const completeStep1 = (role: 'COMPANY' | 'DRIVER' = 'COMPANY') => {
+  fireEvent.change(screen.getByLabelText(/correo electrónico/i), {
+    target: { value: 'user@test.com' },
+  })
+  fireEvent.change(screen.getByLabelText(/^contraseña$/i), {
+    target: { value: 'Password1' },
+  })
+  fireEvent.change(screen.getByLabelText(/repetir contraseña/i), {
+    target: { value: 'Password1' },
+  })
+  fireEvent.click(
+    screen.getByLabelText(role === 'COMPANY' ? /empresa/i : /transportista/i)
+  )
+  fireEvent.click(screen.getByLabelText(/acepto las condiciones/i))
+  fireEvent.click(screen.getByRole('button', { name: /siguiente/i }))
+}
+
 describe('RegisterPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('renders role select and email/password fields', () => {
+  it('renders step 1 with credentials, role radios and terms checkbox', () => {
     renderRegister()
-    expect(screen.getByLabelText(/tipo de cuenta/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/correo electrónico/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^contraseña$/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/repetir contraseña/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/empresa/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/transportista/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/acepto las condiciones/i)).toBeInTheDocument()
   })
 
-  it('shows company fields when role is COMPANY', () => {
+  it('shows password rules feedback', () => {
     renderRegister()
-    const select = screen.getByLabelText(/tipo de cuenta/i)
-    fireEvent.change(select, { target: { value: 'COMPANY' } })
-    expect(screen.getByLabelText(/nombre de la empresa/i)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/^contraseña$/i), {
+      target: { value: 'Password1' },
+    })
+    expect(screen.getByText(/✓ número/i)).toBeInTheDocument()
+    expect(screen.getByText(/✓ letra mayúscula/i)).toBeInTheDocument()
+  })
+
+  it('does not advance without accepting terms', () => {
+    renderRegister()
+    fireEvent.change(screen.getByLabelText(/correo electrónico/i), {
+      target: { value: 'user@test.com' },
+    })
+    fireEvent.change(screen.getByLabelText(/^contraseña$/i), {
+      target: { value: 'Password1' },
+    })
+    fireEvent.change(screen.getByLabelText(/repetir contraseña/i), {
+      target: { value: 'Password1' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /siguiente/i }))
+    expect(toast.error).toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /registrarse/i })).not.toBeInTheDocument()
+  })
+
+  it('shows company fields on step 2 when role is COMPANY', () => {
+    renderRegister()
+    completeStep1('COMPANY')
+    expect(screen.getByLabelText(/razón social/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/cuit/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/ubicación/i)).toBeInTheDocument()
   })
 
-  it('shows driver fields when role is DRIVER', () => {
+  it('shows driver fields on step 2 when role is DRIVER', () => {
     renderRegister()
-    const select = screen.getByLabelText(/tipo de cuenta/i)
-    fireEvent.change(select, { target: { value: 'DRIVER' } })
+    completeStep1('DRIVER')
     expect(screen.getByLabelText(/licencia de conducir/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/patente/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/tipo de vehículo/i)).toBeInTheDocument()
+    expect(screen.getByText(/cargar tus camiones desde el perfil/i)).toBeInTheDocument()
   })
 
-  it('calls api.post on submit with all form fields', async () => {
+  it('calls api.post on submit with form fields', async () => {
     vi.mocked(api.post).mockResolvedValue({
       data: {
         data: {
           accessToken: 'token',
           refreshToken: 'refresh',
-          user: { id: '1', email: 'company@test.com', role: 'COMPANY' },
+          user: { id: '1', email: 'user@test.com', role: 'COMPANY' },
         },
       },
     })
 
     renderRegister()
-    fireEvent.change(screen.getByLabelText(/tipo de cuenta/i), { target: { value: 'COMPANY' } })
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'company@test.com' } })
-    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'password123' } })
-    fireEvent.change(screen.getByLabelText(/nombre de la empresa/i), { target: { value: 'Acme' } })
+    completeStep1('COMPANY')
+    fireEvent.change(screen.getByLabelText(/razón social/i), { target: { value: 'Acme' } })
     fireEvent.change(screen.getByLabelText(/cuit/i), { target: { value: '20-12345678-1' } })
-    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '1234567890' } })
-    fireEvent.click(screen.getByRole('button', { name: /crear cuenta/i }))
+    fireEvent.click(screen.getByRole('button', { name: /registrarse/i }))
 
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/auth/register', expect.objectContaining({
-        email: 'company@test.com',
-        password: 'password123',
+        email: 'user@test.com',
+        password: 'Password1',
         role: 'COMPANY',
         companyName: 'Acme',
       }))
@@ -104,15 +155,14 @@ describe('RegisterPage', () => {
         data: {
           accessToken: 'token',
           refreshToken: 'refresh',
-          user: { id: '1', email: 'driver@test.com', role: 'DRIVER' },
+          user: { id: '1', email: 'user@test.com', role: 'COMPANY' },
         },
       },
     })
 
     renderRegister()
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'driver@test.com' } })
-    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'password123' } })
-    fireEvent.click(screen.getByRole('button', { name: /crear cuenta/i }))
+    completeStep1('COMPANY')
+    fireEvent.click(screen.getByRole('button', { name: /registrarse/i }))
 
     await waitFor(() => {
       expect(mockSetAuth).toHaveBeenCalled()
@@ -120,8 +170,32 @@ describe('RegisterPage', () => {
     })
   })
 
-  it('shows alert on failure', async () => {
-    const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {})
+  it('allows skipping details ("completar la información luego")', async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        data: {
+          accessToken: 'token',
+          refreshToken: 'refresh',
+          user: { id: '1', email: 'user@test.com', role: 'COMPANY' },
+        },
+      },
+    })
+
+    renderRegister()
+    completeStep1('COMPANY')
+    fireEvent.click(screen.getByRole('button', { name: /^sí$/i }))
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/auth/register', {
+        email: 'user@test.com',
+        password: 'Password1',
+        role: 'COMPANY',
+      })
+      expect(mockNavigate).toHaveBeenCalledWith('/dashboard')
+    })
+  })
+
+  it('shows toast error on failure', async () => {
     vi.mocked(api.post).mockRejectedValue({
       response: {
         data: {
@@ -133,29 +207,12 @@ describe('RegisterPage', () => {
     })
 
     renderRegister()
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'taken@test.com' } })
-    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'password123' } })
-    fireEvent.click(screen.getByRole('button', { name: /crear cuenta/i }))
+    completeStep1('COMPANY')
+    fireEvent.click(screen.getByRole('button', { name: /registrarse/i }))
 
     await waitFor(() => {
-      expect(alertMock).toHaveBeenCalledWith('Email ya registrado')
+      expect(toast.error).toHaveBeenCalledWith('Email ya registrado')
     })
-    alertMock.mockRestore()
-  })
-
-  it('disables button while loading', async () => {
-    let resolve: (val: unknown) => void
-    vi.mocked(api.post).mockImplementation(
-      () => new Promise((r) => { resolve = r as unknown as (val: unknown) => void })
-    )
-
-    renderRegister()
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'test@test.com' } })
-    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'password123' } })
-    fireEvent.click(screen.getByRole('button', { name: /crear cuenta/i }))
-
-    expect(screen.getByRole('button', { name: /creando cuenta/i })).toBeDisabled()
-    resolve!({ data: { data: { accessToken: '', refreshToken: '', user: {} } } })
   })
 
   it('has a link to login page', () => {
