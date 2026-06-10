@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../models/prisma.js'
+import { emailService } from './emailService.js'
 import { broadcastToUser } from '../websocket/index.js'
 
 export const notificationService = {
@@ -18,11 +19,8 @@ export const notificationService = {
     return notification
   },
 
-  async sendEmail(to: string, subject: string, _emailBody: string) {
-    // Stub for V1 — use console.log
-    // TODO: integrate with SendGrid or AWS SES
-    console.log(`[EMAIL] To: ${to}, Subject: ${subject}`)
-    return { sent: true }
+  async sendEmail(to: string, subject: string, emailBody: string) {
+    return emailService.send(to, subject, `<p>${emailBody}</p>`)
   },
 
   async notifyAuctionClosed(auctionId: string, winnerId: string | null) {

@@ -1,10 +1,12 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { config } from '../config/index.js'
 import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
+import { emailService } from '../services/emailService.js'
 import { authenticate } from '../middleware/auth.js'
 import type { Request, Response } from 'express'
 
@@ -50,6 +52,7 @@ router.post('/register', async (req, res, next) => {
     if (existing) return next(errors.conflict('Email already registered'))
 
     const passwordHash = await bcrypt.hash(data.password, 12)
+    const emailVerifyToken = randomUUID()
 
     const user = await prisma.user.create({
       data: {
@@ -62,8 +65,16 @@ router.post('/register', async (req, res, next) => {
         vehiclePlate: data.vehiclePlate,
         vehicleType: data.vehicleType,
         phone: data.phone,
+        emailVerifyToken,
       },
     })
+
+    const verifyUrl = `${config.frontendUrl}/verify-email?token=${emailVerifyToken}`
+    await emailService.send(
+      user.email,
+      'Verificá tu cuenta de Spottruck',
+      emailService.verificationEmailHtml(verifyUrl)
+    )
 
     const tokens = signTokens(user.id, user.role, user.email)
     res.status(201).json({ data: { user: { id: user.id, email: user.email, role: user.role }, ...tokens } })
@@ -114,12 +125,56 @@ router.post('/logout', authenticate, (_req, res) => {
   res.json({ data: { success: true } })
 })
 
+// POST /auth/verify-email — confirma el email con el token del link
+router.post('/verify-email', async (req, res, next) => {
+  try {
+    const { token } = z.object({ token: z.string().min(1) }).parse(req.body)
+
+    const user = await prisma.user.findUnique({ where: { emailVerifyToken: token } })
+    if (!user) return next(errors.badRequest('Token inválido o ya utilizado'))
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, emailVerifyToken: null },
+    })
+
+    res.json({ data: { verified: true } })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /auth/resend-verification — reenvía el email de verificación
+router.post('/resend-verification', authenticate, async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.sub } })
+    if (!user) return next(errors.notFound('User'))
+    if (user.emailVerified) return next(errors.badRequest('El email ya está verificado'))
+
+    const emailVerifyToken = user.emailVerifyToken ?? randomUUID()
+    if (!user.emailVerifyToken) {
+      await prisma.user.update({ where: { id: user.id }, data: { emailVerifyToken } })
+    }
+
+    const verifyUrl = `${config.frontendUrl}/verify-email?token=${emailVerifyToken}`
+    const result = await emailService.send(
+      user.email,
+      'Verificá tu cuenta de Spottruck',
+      emailService.verificationEmailHtml(verifyUrl)
+    )
+
+    res.json({ data: { sent: result.sent, devMode: !emailService.isConfigured() } })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // GET /auth/me
 router.get('/me', authenticate, async (req: Request, res: Response) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.sub },
     select: {
-      id: true, email: true, role: true,
+      id: true, email: true, role: true, emailVerified: true,
       companyName: true, companyCuit: true, phone: true,
       driverLicense: true, vehiclePlate: true, vehicleType: true,
       vehicleCapacity: true, ratingAvg: true, tripsCompleted: true, createdAt: true,

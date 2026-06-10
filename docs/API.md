@@ -226,7 +226,36 @@ POST  /notifications/read-all
 
 ---
 
+## Email Verification
+
+```http
+POST /auth/verify-email          { "token": "<token del link del email>" }
+POST /auth/resend-verification   (auth) reenvía el link de verificación
+```
+
+Al registrarse se envía un email con el link `FRONTEND_URL/verify-email?token=...`.
+Sin `RESEND_API_KEY` configurada, el email se loguea en la consola del servidor.
+
+---
+
 ## Payments
+
+El flujo de pago depende de la configuración:
+
+- **Con `MERCADOPAGO_ACCESS_TOKEN`**: al aceptar una oferta el pago nace
+  `PENDING` con un `paymentUrl` (Checkout Pro). Cuando la empresa paga,
+  MercadoPago notifica al webhook y el pago pasa a `HELD` (custodia).
+- **Sin credenciales (modo simulado)**: el pago nace `HELD` directamente.
+
+En ambos casos, `HELD → RELEASED` ocurre cuando la empresa confirma la
+entrega (`POST /trips/:id/confirm-delivery`).
+
+### Webhook MercadoPago
+```http
+POST /payments/webhook            (lo llama MercadoPago, sin auth)
+```
+Configurar en el panel de MP apuntando a `API_URL/api/v1/payments/webhook`.
+Si `MERCADOPAGO_WEBHOOK_SECRET` está seteado se valida la firma `x-signature`.
 
 ### Hold Payment
 ```http

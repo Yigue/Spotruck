@@ -3,9 +3,79 @@ import { z } from 'zod'
 import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
+import { mercadopagoService } from '../services/mercadopagoService.js'
+import { notificationService } from '../services/notificationService.js'
 import { authenticate } from '../middleware/auth.js'
 
 const router = Router()
+
+// POST /payments/webhook — notificaciones de MercadoPago (sin auth: las
+// llama MP; se valida la firma x-signature si hay webhook secret)
+router.post('/webhook', async (req, res) => {
+  try {
+    const dataId =
+      (req.query['data.id'] as string | undefined) ??
+      (req.body as { data?: { id?: string } })?.data?.id
+    const type = (req.query.type as string | undefined) ?? (req.body as { type?: string })?.type
+
+    // MP reintenta si no respondemos 200; los eventos que no son de pago se ignoran
+    if (type !== 'payment' || !dataId) {
+      res.sendStatus(200)
+      return
+    }
+
+    const validSignature = mercadopagoService.verifyWebhookSignature({
+      signature: req.headers['x-signature'] as string | undefined,
+      requestId: req.headers['x-request-id'] as string | undefined,
+      dataId,
+    })
+    if (!validSignature) {
+      res.sendStatus(401)
+      return
+    }
+
+    const mpPayment = await mercadopagoService.getPayment(dataId)
+    if (!mpPayment.external_reference) {
+      res.sendStatus(200)
+      return
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { id: mpPayment.external_reference },
+      include: { trip: { select: { id: true, userId: true, originAddress: true, destAddress: true } } },
+    })
+    if (!payment) {
+      res.sendStatus(200)
+      return
+    }
+
+    // approved → el dinero queda en custodia (HELD) hasta confirmar la entrega
+    if (mpPayment.status === 'approved' && payment.status === 'PENDING') {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'HELD', mercadopagoStatus: mpPayment.status },
+      })
+      await notificationService.createInApp(
+        payment.userId,
+        'PAYMENT_HELD',
+        'La empresa pagó el viaje',
+        `El pago de ${payment.amount} ARS quedó en custodia. Se libera al confirmar la entrega`,
+        { tripId: payment.tripId, paymentId: payment.id }
+      )
+    } else {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { mercadopagoStatus: mpPayment.status },
+      })
+    }
+
+    res.sendStatus(200)
+  } catch (err) {
+    console.error('[MP] Error procesando webhook:', err)
+    // 500 para que MP reintente
+    res.sendStatus(500)
+  }
+})
 
 // POST /payments/hold — crear hold de pago al asignar transportista
 router.post('/hold', authenticate, async (req, res, next) => {

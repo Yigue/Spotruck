@@ -10,6 +10,7 @@ import NewTripPage from './pages/NewTripPage'
 import AuctionPage from './pages/AuctionPage'
 import ExplorePage from './pages/ExplorePage'
 import ProfilePage from './pages/ProfilePage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -24,6 +25,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />

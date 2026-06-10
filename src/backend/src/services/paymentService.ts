@@ -1,10 +1,15 @@
 import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
+import { mercadopagoService } from './mercadopagoService.js'
+import { notificationService } from './notificationService.js'
 
 export const paymentService = {
   async createHold(tripId: string, driverId: string) {
-    const trip = await prisma.trip.findUnique({ where: { id: tripId } })
+    const trip = await prisma.trip.findUnique({
+      where: { id: tripId },
+      include: { user: { select: { id: true, email: true } } },
+    })
     if (!trip) throw errors.notFound('Trip')
 
     const auction = await prisma.auction.findUnique({ where: { tripId } })
@@ -15,6 +20,10 @@ export const paymentService = {
     const netAmount = amount - platformFee
     const holdExpiresAt = new Date(Date.now() + config.payment.holdDurationHours * 60 * 60 * 1000)
 
+    // Con MercadoPago configurado el pago nace PENDING y pasa a HELD cuando
+    // la empresa paga (webhook). Sin credenciales: modo simulado, HELD directo.
+    const useMP = mercadopagoService.isConfigured()
+
     const payment = await prisma.payment.create({
       data: {
         tripId,
@@ -22,10 +31,35 @@ export const paymentService = {
         amount,
         platformFee,
         netAmount,
-        status: 'HELD',
+        status: useMP ? 'PENDING' : 'HELD',
         holdExpiresAt,
       },
     })
+
+    if (useMP) {
+      try {
+        const preference = await mercadopagoService.createPreference({
+          paymentId: payment.id,
+          title: `Flete ${trip.originAddress} → ${trip.destAddress}`,
+          amount,
+          payerEmail: trip.user.email,
+        })
+        const updated = await prisma.payment.update({
+          where: { id: payment.id },
+          data: { mercadopagoId: preference.id, paymentUrl: preference.initPoint },
+        })
+        await notificationService.createInApp(
+          trip.userId,
+          'PAYMENT_PENDING',
+          'Pagá el viaje para confirmar al transportista',
+          `El pago de ${amount} ARS queda en custodia hasta que confirmes la entrega`,
+          { tripId, paymentId: payment.id, paymentUrl: preference.initPoint }
+        )
+        return updated
+      } catch (err) {
+        console.error('[MP] No se pudo crear la preferencia de pago:', err)
+      }
+    }
 
     return payment
   },

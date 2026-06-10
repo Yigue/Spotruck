@@ -23,6 +23,7 @@ interface Truck {
 interface Me {
   id: string
   email: string
+  emailVerified?: boolean
   role: 'COMPANY' | 'DRIVER' | 'ADMIN'
   companyName?: string
   companyCuit?: string
@@ -184,10 +185,37 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
+      {me.emailVerified === false && (
+        <div className="bg-warning/10 border border-warning/40 rounded-lg p-3 flex items-center justify-between gap-4">
+          <p className="text-sm">
+            ⚠️ Tu email todavía no está verificado. Revisá tu casilla o pedí un nuevo link.
+          </p>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() =>
+              api
+                .post('/auth/resend-verification')
+                .then(({ data }) =>
+                  toast.success(
+                    data.data.devMode
+                      ? 'Link generado (modo dev: revisá la consola del servidor)'
+                      : 'Te reenviamos el email de verificación'
+                  )
+                )
+                .catch(() => toast.error('No se pudo reenviar el email'))
+            }
+          >
+            Reenviar email
+          </Button>
+        </div>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold">Mi perfil</h1>
         <p className="text-text-muted text-sm">
           {me.email} · {isDriver ? 'Transportista' : 'Empresa'}
+          {me.emailVerified && <span className="text-success ml-1">✓ verificado</span>}
           {me.ratingCount > 0 && (
             <span className="text-warning ml-2">
               ★ {me.ratingAvg.toFixed(1)} ({me.ratingCount})

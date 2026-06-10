@@ -102,6 +102,7 @@ model User {
 
   // Profile
   emailVerified  Boolean  @default(false) @map("email_verified")
+  emailVerifyToken String? @unique @map("email_verify_token")
   address        String?
   website        String?
   sector         String?
@@ -274,6 +275,8 @@ model Payment {
   status            PaymentStatus @default(PENDING)
 
   mercadopagoId    String?       @map("mercadopago_id")
+  mercadopagoStatus String?      @map("mercadopago_status")
+  paymentUrl       String?       @map("payment_url")
   holdExpiresAt    DateTime?     @map("hold_expires_at")
 
   createdAt         DateTime      @default(now()) @map("created_at")

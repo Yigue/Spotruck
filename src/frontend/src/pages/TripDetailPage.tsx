@@ -9,6 +9,7 @@ import { BidList, type BidWithDetails } from '../components/auctions/BidList'
 import { RatingForm } from '../components/ratings/RatingForm'
 import { TripStatusStepper } from '../components/trips/TripStatusStepper'
 import { UserProfileModal } from '../components/users/UserProfileModal'
+import { PaymentCard } from '../components/payments/PaymentCard'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Spinner } from '../components/ui/Spinner'
 import { Card } from '../components/ui/Card'
@@ -357,6 +358,15 @@ export default function TripDetailPage() {
               )}
             </div>
           </Card>
+
+          {inLifecycle && (
+            <PaymentCard
+              tripId={trip.id}
+              isOwnerCompany={isOwnerCompany}
+              isAssignedDriver={isAssignedDriver}
+              tripStatus={trip.status}
+            />
+          )}
 
           {trip.user && (
             <Card>
