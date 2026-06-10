@@ -7,7 +7,58 @@ interface AuthenticatedWebSocket extends WebSocket {
   userId?: string
   userRole?: string
   isAlive?: boolean
+  channels?: Set<string>
 }
+
+// Registro de suscripciones: canal → conexiones.
+// Canales: `auction:<id>`, `trip:<id>` (suscripción explícita) y
+// `user:<id>` (automático al conectar, para notificaciones personales)
+const channels = new Map<string, Set<AuthenticatedWebSocket>>()
+
+function join(channel: string, ws: AuthenticatedWebSocket) {
+  if (!channels.has(channel)) channels.set(channel, new Set())
+  channels.get(channel)!.add(ws)
+  ws.channels = ws.channels ?? new Set()
+  ws.channels.add(channel)
+}
+
+function leave(channel: string, ws: AuthenticatedWebSocket) {
+  channels.get(channel)?.delete(ws)
+  if (channels.get(channel)?.size === 0) channels.delete(channel)
+  ws.channels?.delete(channel)
+}
+
+function leaveAll(ws: AuthenticatedWebSocket) {
+  for (const channel of ws.channels ?? []) {
+    channels.get(channel)?.delete(ws)
+    if (channels.get(channel)?.size === 0) channels.delete(channel)
+  }
+  ws.channels?.clear()
+}
+
+// Broadcast a todas las conexiones suscriptas a un canal
+export function broadcast(channel: string, data: object) {
+  const subscribers = channels.get(channel)
+  if (!subscribers) return
+  const payload = JSON.stringify(data)
+  for (const ws of subscribers) {
+    if (ws.readyState === WebSocket.OPEN) ws.send(payload)
+  }
+}
+
+export function broadcastToAuction(auctionId: string, data: object) {
+  broadcast(`auction:${auctionId}`, { type: 'auction_update', auctionId, ...data })
+}
+
+export function broadcastToTrip(tripId: string, data: object) {
+  broadcast(`trip:${tripId}`, { tripId, ...data })
+}
+
+export function broadcastToUser(userId: string, data: object) {
+  broadcast(`user:${userId}`, data)
+}
+
+const SUBSCRIBABLE = ['auction', 'trip'] as const
 
 export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({ server, path: '/ws' })
@@ -45,6 +96,9 @@ export function setupWebSocket(server: Server) {
       return
     }
 
+    // Canal personal para notificaciones
+    join(`user:${ws.userId}`, ws)
+
     ws.on('pong', () => { ws.isAlive = true })
 
     ws.on('message', (data) => {
@@ -57,20 +111,38 @@ export function setupWebSocket(server: Server) {
     })
 
     ws.on('close', () => {
-      // Cleanup subscriptions
+      leaveAll(ws)
     })
 
     // Send welcome
     ws.send(JSON.stringify({ type: 'connected', userId: ws.userId }))
   })
 
-  function handleMessage(ws: AuthenticatedWebSocket, msg: { type: string; payload?: unknown }) {
+  function handleMessage(
+    ws: AuthenticatedWebSocket,
+    msg: { type: string; payload?: { channel?: string; id?: string; auctionId?: string } }
+  ) {
     switch (msg.type) {
-      case 'subscribe':
-        // Subscribe to auction updates
-        // payload: { auctionId: string }
-        ws.send(JSON.stringify({ type: 'subscribed', auctionId: (msg.payload as { auctionId: string }).auctionId }))
+      case 'subscribe': {
+        // payload: { channel: 'auction' | 'trip', id } — se mantiene el
+        // formato legado { auctionId } por compatibilidad
+        const legacyAuctionId = msg.payload?.auctionId
+        const channel = legacyAuctionId ? 'auction' : msg.payload?.channel
+        const id = legacyAuctionId ?? msg.payload?.id
+        if (!channel || !id || !SUBSCRIBABLE.includes(channel as (typeof SUBSCRIBABLE)[number])) {
+          ws.send(JSON.stringify({ type: 'error', code: 'INVALID_SUBSCRIPTION' }))
+          return
+        }
+        join(`${channel}:${id}`, ws)
+        ws.send(JSON.stringify({ type: 'subscribed', channel, id }))
         break
+      }
+      case 'unsubscribe': {
+        const { channel, id } = msg.payload ?? {}
+        if (channel && id) leave(`${channel}:${id}`, ws)
+        ws.send(JSON.stringify({ type: 'unsubscribed', channel, id }))
+        break
+      }
       case 'ping':
         ws.send(JSON.stringify({ type: 'pong' }))
         break
@@ -82,16 +154,4 @@ export function setupWebSocket(server: Server) {
   wss.on('close', () => { clearInterval(heartbeat) })
 
   return wss
-}
-
-// Helper to broadcast to all clients subscribed to an auction
-export function broadcastToAuction(auctionId: string, data: object) {
-  const wss = (global as unknown as { wss?: WebSocketServer }).wss
-  if (!wss) return
-  wss.clients.forEach((client) => {
-    const ws = client as AuthenticatedWebSocket
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'auction_update', auctionId, ...data }))
-    }
-  })
 }

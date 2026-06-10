@@ -1,7 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState, useCallback } from 'react'
 import { TripDetailMap } from '../components/maps/TripDetailMap'
+import { LiveTrackingMap } from '../components/maps/LiveTrackingMap'
 import { AuctionCard } from '../components/auctions/AuctionCard'
+import { AuctionCountdown } from '../components/auctions/AuctionCountdown'
 import { BidForm } from '../components/auctions/BidForm'
 import { BidList, type BidWithDetails } from '../components/auctions/BidList'
 import { RatingForm } from '../components/ratings/RatingForm'
@@ -100,6 +102,12 @@ export default function TripDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [showRating, setShowRating] = useState(false)
   const [profileUserId, setProfileUserId] = useState<string | null>(null)
+  const [livePosition, setLivePosition] = useState<{
+    lat: number
+    lng: number
+    speed?: number | null
+    recordedAt: string
+  } | null>(null)
 
   const refreshTrip = useCallback(async () => {
     if (!id) return
@@ -113,7 +121,15 @@ export default function TripDetailPage() {
 
   const handleWSMessage = useCallback(
     (msg: { type: string; [key: string]: unknown }) => {
-      if (msg.type === 'auction_update') refreshTrip()
+      if (msg.type === 'auction_update' || msg.type === 'trip_update') refreshTrip()
+      if (msg.type === 'tracking_update') {
+        setLivePosition({
+          lat: msg.lat as number,
+          lng: msg.lng as number,
+          speed: msg.speed as number | null,
+          recordedAt: msg.recordedAt as string,
+        })
+      }
     },
     [refreshTrip]
   )
@@ -122,9 +138,15 @@ export default function TripDetailPage() {
 
   useEffect(() => {
     if (trip?.auction?.id) {
-      subscribe(trip.auction.id)
+      subscribe(trip.auction.id, 'auction')
     }
   }, [trip?.auction?.id, subscribe])
+
+  useEffect(() => {
+    if (trip?.id) {
+      subscribe(trip.id, 'trip')
+    }
+  }, [trip?.id, subscribe])
 
   useEffect(() => {
     if (!id) return
@@ -220,17 +242,32 @@ export default function TripDetailPage() {
         </Card>
       )}
 
-      {/* Map */}
-      <Card className="p-0 overflow-hidden">
-        <TripDetailMap
-          originLat={trip.originLat}
-          originLng={trip.originLng}
-          destLat={trip.destLat}
-          destLng={trip.destLng}
-          originAddress={trip.originAddress}
-          destAddress={trip.destAddress}
-        />
-      </Card>
+      {/* Map: tracking en vivo durante el viaje, mapa estático antes */}
+      {['IN_PROGRESS', 'DELIVERED'].includes(trip.status) ? (
+        <Card>
+          <h2 className="text-lg font-bold mb-4">Seguimiento en vivo</h2>
+          <LiveTrackingMap
+            tripId={trip.id}
+            originLat={trip.originLat}
+            originLng={trip.originLng}
+            destLat={trip.destLat}
+            destLng={trip.destLng}
+            isAssignedDriver={isAssignedDriver && trip.status === 'IN_PROGRESS'}
+            livePosition={livePosition}
+          />
+        </Card>
+      ) : (
+        <Card className="p-0 overflow-hidden">
+          <TripDetailMap
+            originLat={trip.originLat}
+            originLng={trip.originLng}
+            destLat={trip.destLat}
+            destLng={trip.destLng}
+            originAddress={trip.originAddress}
+            destAddress={trip.destAddress}
+          />
+        </Card>
+      )}
 
       {/* Trip Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -349,7 +386,10 @@ export default function TripDetailPage() {
         <Card>
           {isOwnerCompany ? (
             <>
-              <h2 className="text-lg font-bold mb-4">Postulantes</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">Postulantes</h2>
+                <AuctionCountdown endTime={trip.auction.endTime} status={trip.auction.status} />
+              </div>
               <BidList
                 bids={trip.auction.bids ?? []}
                 canDecide={trip.auction.status === 'OPEN'}
@@ -358,7 +398,10 @@ export default function TripDetailPage() {
             </>
           ) : (
             <>
-              <h2 className="text-lg font-bold mb-4">Subasta</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">Subasta</h2>
+                <AuctionCountdown endTime={trip.auction.endTime} status={trip.auction.status} />
+              </div>
               <AuctionCard
                 auction={trip.auction}
                 trip={{ originAddress: trip.originAddress, destAddress: trip.destAddress }}

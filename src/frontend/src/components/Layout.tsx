@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../hooks/useAuthStore'
+import { NotificationBell } from './notifications/NotificationBell'
 
 const navItems: { to: string; label: string; icon: string; driverOnly?: boolean }[] = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -41,6 +42,9 @@ export default function Layout() {
           ))}
         </nav>
         <div className="p-4 border-t border-secondary-500">
+          <div className="mb-3">
+            <NotificationBell />
+          </div>
           <div className="text-sm mb-2">
             <p className="font-medium">{user?.companyName || user?.email}</p>
             <p className="text-xs text-secondary-500">{user?.role}</p>

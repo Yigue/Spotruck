@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
+import { broadcastToTrip } from '../websocket/index.js'
 import { authenticate } from '../middleware/auth.js'
 
 const router = Router()
@@ -65,6 +66,15 @@ router.post('/:tripId', authenticate, async (req, res, next) => {
     if (trip.status === 'ASSIGNED') {
       await prisma.trip.update({ where: { id: req.params.tripId as string }, data: { status: 'IN_PROGRESS' } })
     }
+
+    broadcastToTrip(trip.id, {
+      type: 'tracking_update',
+      lat,
+      lng,
+      speed,
+      heading,
+      recordedAt: log.recordedAt.toISOString(),
+    })
 
     res.status(201).json({ data: log })
   } catch (err) {

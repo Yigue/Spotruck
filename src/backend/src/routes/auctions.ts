@@ -4,6 +4,7 @@ import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
 import { notificationService } from '../services/notificationService.js'
+import { broadcastToAuction } from '../websocket/index.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
 
 const router = Router()
@@ -161,6 +162,8 @@ router.post('/:id/bid', authenticate, requireRole('DRIVER'), async (req, res, ne
       `Un transportista ofreció ${amount} ARS por ${auction.trip.originAddress} → ${auction.trip.destAddress}`,
       { tripId: auction.tripId, auctionId, bidId: bid.id }
     )
+
+    broadcastToAuction(auctionId, { currentPrice: amount, endTime: newEndTime.toISOString(), bidId: bid.id })
 
     res.status(201).json({ data: bid })
   } catch (err) {

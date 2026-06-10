@@ -6,20 +6,29 @@ interface WSMessage {
   [key: string]: unknown
 }
 
+type Channel = 'auction' | 'trip'
+
 export function useWebSocket(onMessage: (msg: WSMessage) => void) {
   const wsRef = useRef<WebSocket | null>(null)
   const { token } = useAuthStore()
   const authToken = token
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout>>()
+  // Suscripciones activas, para re-suscribir tras una reconexión
+  const subscriptions = useRef<Set<string>>(new Set())
 
   const connect = useCallback(() => {
     if (!authToken) return
 
-    const ws = new WebSocket(`ws://localhost:4000/ws?token=${authToken}`)
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+    const host = import.meta.env.DEV ? 'localhost:4000' : window.location.host
+    const ws = new WebSocket(`${proto}://${host}/ws?token=${authToken}`)
     wsRef.current = ws
 
     ws.onopen = () => {
-      console.log('[WS] Connected')
+      for (const sub of subscriptions.current) {
+        const [channel, id] = sub.split(':')
+        ws.send(JSON.stringify({ type: 'subscribe', payload: { channel, id } }))
+      }
     }
 
     ws.onmessage = (event) => {
@@ -32,7 +41,6 @@ export function useWebSocket(onMessage: (msg: WSMessage) => void) {
     }
 
     ws.onclose = () => {
-      console.log('[WS] Disconnected, reconnecting in 3s...')
       reconnectTimeout.current = setTimeout(connect, 3000)
     }
 
@@ -47,13 +55,26 @@ export function useWebSocket(onMessage: (msg: WSMessage) => void) {
     }
     return () => {
       clearTimeout(reconnectTimeout.current)
-      wsRef.current?.close()
+      if (wsRef.current) {
+        wsRef.current.onclose = null
+        wsRef.current.close()
+      }
     }
   }, [authToken, connect])
 
-  const subscribe = useCallback((auctionId: string) => {
-    wsRef.current?.send(JSON.stringify({ type: 'subscribe', payload: { auctionId } }))
+  const subscribe = useCallback((id: string, channel: Channel = 'auction') => {
+    subscriptions.current.add(`${channel}:${id}`)
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'subscribe', payload: { channel, id } }))
+    }
   }, [])
 
-  return { subscribe }
+  const unsubscribe = useCallback((id: string, channel: Channel = 'auction') => {
+    subscriptions.current.delete(`${channel}:${id}`)
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'unsubscribe', payload: { channel, id } }))
+    }
+  }, [])
+
+  return { subscribe, unsubscribe }
 }

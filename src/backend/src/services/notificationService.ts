@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../models/prisma.js'
+import { broadcastToUser } from '../websocket/index.js'
 
 export const notificationService = {
   async createInApp(
@@ -9,9 +10,12 @@ export const notificationService = {
     body?: string,
     payload?: Prisma.InputJsonValue
   ) {
-    return prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: { userId, type, title, body, payload },
     })
+    // Push en tiempo real al canal personal del usuario
+    broadcastToUser(userId, { type: 'notification', notification })
+    return notification
   },
 
   async sendEmail(to: string, subject: string, _emailBody: string) {

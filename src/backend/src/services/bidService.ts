@@ -2,6 +2,7 @@ import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
 import { paymentService } from './paymentService.js'
 import { notificationService } from './notificationService.js'
+import { broadcastToAuction, broadcastToTrip } from '../websocket/index.js'
 
 export const bidService = {
   // La empresa acepta una oferta: cierra la subasta, rechaza el resto,
@@ -34,6 +35,9 @@ export const bidService = {
     ])
 
     const payment = await paymentService.createHold(trip.id, bid.userId)
+
+    broadcastToAuction(bid.auctionId, { status: 'SETTLED', currentPrice: bid.amount })
+    broadcastToTrip(trip.id, { type: 'trip_update', status: 'ASSIGNED' })
 
     await notificationService.createInApp(
       bid.userId,

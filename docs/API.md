@@ -297,10 +297,29 @@ Content-Type: application/json
 }
 ```
 
-### Subscribe to Trip
-```ws
-ws://localhost:4000/tracking/subscribe/:tripId
+## WebSocket (tiempo real)
+
 ```
+ws://localhost:4000/ws?token=<accessToken>
+```
+
+Al conectar, el servidor suscribe automáticamente al canal personal
+`user:<id>` (notificaciones). Suscripción explícita a subastas y viajes:
+
+```json
+{ "type": "subscribe", "payload": { "channel": "auction", "id": "<auctionId>" } }
+{ "type": "subscribe", "payload": { "channel": "trip", "id": "<tripId>" } }
+{ "type": "unsubscribe", "payload": { "channel": "trip", "id": "<tripId>" } }
+```
+
+Mensajes que emite el servidor:
+
+| type | Canal | Cuándo |
+|---|---|---|
+| `auction_update` | auction | nueva oferta (trae `currentPrice`, `endTime`) o cierre (`status: SETTLED`) |
+| `trip_update` | trip | cambio de estado del viaje (`status`) |
+| `tracking_update` | trip | nueva posición GPS (`lat`, `lng`, `speed`, `recordedAt`) |
+| `notification` | user | notificación in-app nueva (trae el objeto `notification`) |
 
 ---
 

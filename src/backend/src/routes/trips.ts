@@ -4,6 +4,7 @@ import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
 import { notificationService } from '../services/notificationService.js'
 import { paymentService } from '../services/paymentService.js'
+import { broadcastToTrip } from '../websocket/index.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
 
 const router = Router()
@@ -197,6 +198,7 @@ router.post('/:id/start', authenticate, requireRole('DRIVER'), async (req, res, 
       `${trip.originAddress} → ${trip.destAddress}`,
       { tripId: trip.id, status: 'IN_PROGRESS' }
     )
+    broadcastToTrip(trip.id, { type: 'trip_update', status: 'IN_PROGRESS' })
 
     res.json({ data: updated })
   } catch (err) {
@@ -223,6 +225,7 @@ router.post('/:id/finish', authenticate, requireRole('DRIVER'), async (req, res,
       'Confirmá la entrega para finalizar y liberar el pago',
       { tripId: trip.id, status: 'DELIVERED' }
     )
+    broadcastToTrip(trip.id, { type: 'trip_update', status: 'DELIVERED' })
 
     res.json({ data: updated })
   } catch (err) {
@@ -265,6 +268,8 @@ router.post('/:id/confirm-delivery', authenticate, requireRole('COMPANY', 'ADMIN
         { tripId: trip.id, status: 'SETTLED' }
       )
     }
+
+    broadcastToTrip(trip.id, { type: 'trip_update', status: 'SETTLED' })
 
     const updated = await prisma.trip.findUnique({ where: { id: trip.id } })
     res.json({ data: updated })

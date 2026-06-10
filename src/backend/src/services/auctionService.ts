@@ -1,6 +1,7 @@
 import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
+import { broadcastToAuction, broadcastToTrip } from '../websocket/index.js'
 
 export const auctionService = {
   async startAuction(tripId: string) {
@@ -89,6 +90,9 @@ export const auctionService = {
     }
 
     await prisma.auction.update({ where: { id: auctionId }, data: { status: 'SETTLED' } })
+
+    broadcastToAuction(auctionId, { status: 'SETTLED', winnerId, winningAmount })
+    if (winnerId) broadcastToTrip(auction.tripId, { type: 'trip_update', status: 'ASSIGNED' })
 
     return { auctionId, winnerId, winningAmount }
   },
