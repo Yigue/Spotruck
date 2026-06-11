@@ -37,8 +37,11 @@ const createTripSchema = z.object({
 const updateTripSchema = createTripSchema.partial().strict()
 
 const tripWhereSchema = z.object({
-  status: z.string().optional(),
-  cargoType: z.string().optional(),
+  // Filtros validados contra los enums: un valor inválido da 400, no un 500 de Prisma
+  status: z
+    .enum(['DRAFT', 'OPEN', 'AUCTION', 'ASSIGNED', 'IN_PROGRESS', 'DELIVERED', 'SETTLED', 'CANCELLED'])
+    .optional(),
+  cargoType: z.enum(['BULK', 'PALLETS', 'GENERAL', 'REFRIGERATED']).optional(),
   minPrice: z.string().optional(),
   maxPrice: z.string().optional(),
   page: z.string().optional(),

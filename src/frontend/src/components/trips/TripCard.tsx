@@ -1,5 +1,6 @@
 import { Card } from '../ui/Card'
 import { Badge } from '../ui/Badge'
+import { tripStatusLabels, tripStatusVariant, cargoLabels } from '../../utils/labels'
 
 interface TripCardProps {
   trip: {
@@ -14,16 +15,6 @@ interface TripCardProps {
     auction?: { currentPrice: number; status: string }
   }
   onClick?: () => void
-}
-
-const statusVariant = (status: string): 'success' | 'warning' | 'error' | 'info' | 'default' => {
-  switch (status.toUpperCase()) {
-    case 'COMPLETED': return 'success'
-    case 'IN_PROGRESS': return 'info'
-    case 'PENDING': return 'warning'
-    case 'CANCELLED': return 'error'
-    default: return 'default'
-  }
 }
 
 const formatPrice = (price: number) => {
@@ -56,8 +47,10 @@ export function TripCard({ trip, onClick }: TripCardProps) {
 
         {/* Cargo type and status */}
         <div className="flex items-center gap-2">
-          <Badge variant="info">{trip.cargoType}</Badge>
-          <Badge variant={statusVariant(trip.status)}>{trip.status}</Badge>
+          <Badge variant="info">{cargoLabels[trip.cargoType] ?? trip.cargoType}</Badge>
+          <Badge variant={tripStatusVariant[trip.status] ?? 'default'}>
+            {tripStatusLabels[trip.status] ?? trip.status}
+          </Badge>
         </div>
 
         {/* Price and date */}

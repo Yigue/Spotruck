@@ -26,7 +26,14 @@ const bidSchema = z.object({
 // GET /auctions
 router.get('/', authenticate, async (req, res, next) => {
   try {
-    const { status, type, page = '1', limit = '20' } = req.query
+    const { status, type, page = '1', limit = '20' } = z
+      .object({
+        status: z.enum(['PENDING', 'OPEN', 'CLOSED', 'SETTLED', 'CANCELLED']).optional(),
+        type: z.enum(['OPEN', 'DUTCH', 'SEALED']).optional(),
+        page: z.string().optional(),
+        limit: z.string().optional(),
+      })
+      .parse(req.query)
     const where: Record<string, unknown> = {}
     if (status) where.status = status
     if (type) where.type = type

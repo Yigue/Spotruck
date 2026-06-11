@@ -159,7 +159,14 @@ router.get('/:id/profile', authenticate, async (req, res, next) => {
 
 router.get('/', authenticate, requireRole('ADMIN'), async (req, res, next) => {
   try {
-    const { page = '1', limit = '20', role, documentsStatus } = req.query
+    const { page = '1', limit = '20', role, documentsStatus } = z
+      .object({
+        page: z.string().optional(),
+        limit: z.string().optional(),
+        role: z.enum(['COMPANY', 'DRIVER', 'ADMIN']).optional(),
+        documentsStatus: z.enum(['NONE', 'PENDING', 'APPROVED', 'REJECTED']).optional(),
+      })
+      .parse(req.query)
     const where: Record<string, unknown> = {}
     if (role) where.role = role as 'COMPANY' | 'DRIVER' | 'ADMIN'
     if (documentsStatus) where.documentsStatus = documentsStatus
