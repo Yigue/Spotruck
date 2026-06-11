@@ -2,6 +2,18 @@
 
 **Fecha:** 2026-06-11 · **Rama:** `claude/optimistic-fermat-f62yt2`
 
+> **Estado: ✅ AMBOS FIXES IMPLEMENTADOS** siguiendo este plan.
+> - Decimal: migración `20260611120000_decimal_money`, aritmética con
+>   `Prisma.Decimal` en los puntos de cálculo y `json replacer` global que
+>   serializa como number (frontend sin cambios). Verificado con los asserts
+>   de montos exactos de ambas suites.
+> - Reset de contraseña: migración `20260611120100_password_reset`,
+>   `POST /auth/forgot-password` (siempre 200) y `POST /auth/reset-password`
+>   (token 1 uso / 1 h), páginas `/forgot-password` y `/reset-password`,
+>   link en Login. Cubierto por la sección E8 de `edge-cases.mjs` (10 checks:
+>   anti-enumeración, token inválido/vencido/reusado, reglas de contraseña,
+>   login con la nueva, la vieja deja de servir).
+
 ---
 
 ## Parte 1 — Plan para los fixes pendientes (los "correctos")

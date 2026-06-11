@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
@@ -92,10 +93,9 @@ router.post('/hold', authenticate, async (req, res, next) => {
     }
     if (trip.status !== 'AUCTION') return next(errors.badRequest('Trip must be in AUCTION status'))
 
-    const round2 = (n: number) => Math.round(n * 100) / 100
-    const amount = round2(trip.auction!.currentPrice)
-    const platformFee = round2(amount * config.payment.platformFeePercent)
-    const netAmount = round2(amount - platformFee)
+    const amount = new Prisma.Decimal(trip.auction!.currentPrice).toDecimalPlaces(2)
+    const platformFee = amount.mul(config.payment.platformFeePercent).toDecimalPlaces(2)
+    const netAmount = amount.minus(platformFee)
     const holdExpiresAt = new Date(Date.now() + config.payment.holdDurationHours * 60 * 60 * 1000)
 
     const payment = await prisma.payment.create({

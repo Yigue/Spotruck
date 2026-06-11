@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
 import { notificationService } from '../services/notificationService.js'
@@ -159,7 +160,7 @@ router.post('/', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res,
             type: 'OPEN',
             startTime: new Date(),
             endTime: auctionEndTime(created.endDate),
-            reservePrice: created.basePrice * 0.9,
+            reservePrice: new Prisma.Decimal(created.basePrice).mul(0.9).toDecimalPlaces(2),
             currentPrice: created.basePrice,
             status: 'OPEN',
           },
@@ -196,7 +197,7 @@ router.post('/:id/publish', authenticate, requireRole('COMPANY', 'ADMIN'), async
           type: 'OPEN',
           startTime: new Date(),
           endTime: auctionEndTime(trip.endDate),
-          reservePrice: trip.basePrice * 0.9,
+          reservePrice: new Prisma.Decimal(trip.basePrice).mul(0.9).toDecimalPlaces(2),
           currentPrice: trip.basePrice,
           status: 'OPEN',
         },

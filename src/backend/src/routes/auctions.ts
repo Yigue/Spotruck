@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
@@ -116,7 +117,7 @@ router.post('/', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res,
         type: data.type,
         startTime: data.startTime ? new Date(data.startTime!) : now,
         endTime: data.endTime ? new Date(data.endTime!) : new Date(now.getTime() + 24 * 60 * 60 * 1000),
-        reservePrice: data.reservePrice ?? trip.basePrice * 0.9,
+        reservePrice: data.reservePrice ?? new Prisma.Decimal(trip.basePrice).mul(0.9).toDecimalPlaces(2),
         currentPrice: trip.basePrice,
         status: 'OPEN',
       },
@@ -144,8 +145,8 @@ router.post('/:id/bid', authenticate, requireRole('DRIVER'), async (req, res, ne
     if (auction.status !== 'OPEN') return next(errors.badRequest('Auction is not open'))
     if (new Date() > auction.endTime) return next(errors.badRequest('Auction has ended'))
 
-    const minBid = auction.currentPrice * (1 - config.auction.minBidDecrementPercent)
-    if (amount >= minBid) return next(errors.badRequest(`Bid must be lower than ${minBid}`))
+    const minBid = new Prisma.Decimal(auction.currentPrice).mul(1 - config.auction.minBidDecrementPercent)
+    if (minBid.lte(amount)) return next(errors.badRequest(`Bid must be lower than ${minBid}`))
 
     if (truckId) {
       const truck = await prisma.truck.findUnique({ where: { id: truckId } })

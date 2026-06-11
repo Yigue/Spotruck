@@ -3,6 +3,7 @@ import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
+import { Prisma } from '@prisma/client'
 import { createServer } from 'http'
 import { config } from './config/index.js'
 import { errorHandler } from './middleware/errorHandler.js'
@@ -22,6 +23,14 @@ import { startAuctionCron } from './jobs/auctionCron.js'
 
 const app = express()
 const server = createServer(app)
+
+// Los montos viven en Decimal(12,2): se serializan como number en JSON para
+// que el frontend no cambie. (this[key] es el valor original, antes de toJSON)
+app.set('json replacer', function (this: Record<string, unknown>, key: string, value: unknown) {
+  const original = this[key]
+  if (Prisma.Decimal.isDecimal(original)) return Number(original)
+  return value
+})
 
 // Middleware
 app.use(helmet())

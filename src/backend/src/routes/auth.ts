@@ -12,15 +12,18 @@ import type { Request, Response } from 'express'
 
 const router = Router()
 
+// Mismas reglas que muestra el frontend: el backend es la autoridad.
+// Compartido entre registro y reset de contraseña.
+const passwordSchema = z
+  .string()
+  .min(8, 'La contraseña debe tener al menos 8 caracteres')
+  .regex(/[A-Z]/, 'La contraseña debe incluir una mayúscula')
+  .regex(/[a-z]/, 'La contraseña debe incluir una minúscula')
+  .regex(/\d/, 'La contraseña debe incluir un número')
+
 const registerSchema = z.object({
   email: z.string().email(),
-  // Mismas reglas que muestra el frontend: el backend es la autoridad
-  password: z
-    .string()
-    .min(8, 'La contraseña debe tener al menos 8 caracteres')
-    .regex(/[A-Z]/, 'La contraseña debe incluir una mayúscula')
-    .regex(/[a-z]/, 'La contraseña debe incluir una minúscula')
-    .regex(/\d/, 'La contraseña debe incluir un número'),
+  password: passwordSchema,
   role: z.enum(['COMPANY', 'DRIVER']),
   companyName: z.string().optional(),
   companyCuit: z.string().optional(),
@@ -129,6 +132,60 @@ router.post('/refresh', async (req, res, next) => {
 // POST /auth/logout
 router.post('/logout', authenticate, (_req, res) => {
   res.json({ data: { success: true } })
+})
+
+// POST /auth/forgot-password — pide el link de reset. SIEMPRE responde 200
+// para no revelar si el email existe (anti enumeración de usuarios)
+router.post('/forgot-password', async (req, res, next) => {
+  try {
+    const { email } = z.object({ email: z.string().email() }).parse(req.body)
+
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (user) {
+      const token = randomUUID()
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordResetToken: token,
+          passwordResetExpires: new Date(Date.now() + 60 * 60 * 1000), // 1 hora
+        },
+      })
+      const resetUrl = `${config.frontendUrl}/reset-password?token=${token}`
+      await emailService.send(
+        user.email,
+        'Restablecé tu contraseña de Spottruck',
+        emailService.passwordResetEmailHtml(resetUrl)
+      )
+    }
+
+    res.json({ data: { sent: true } })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /auth/reset-password — cambia la contraseña con el token del email
+router.post('/reset-password', async (req, res, next) => {
+  try {
+    const { token, password } = z
+      .object({ token: z.string().min(1), password: passwordSchema })
+      .parse(req.body)
+
+    const user = await prisma.user.findFirst({
+      where: { passwordResetToken: token, passwordResetExpires: { gt: new Date() } },
+    })
+    if (!user) return next(errors.badRequest('Token inválido o vencido'))
+
+    const passwordHash = await bcrypt.hash(password, 12)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, passwordResetToken: null, passwordResetExpires: null },
+    })
+
+    res.json({ data: { reset: true } })
+  } catch (err) {
+    next(err)
+  }
 })
 
 // POST /auth/verify-email — confirma el email con el token del link

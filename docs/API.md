@@ -251,6 +251,18 @@ GET /stats/me        # estadísticas de los últimos 6 meses según el rol
 
 ---
 
+## Password Reset
+
+```http
+POST /auth/forgot-password   { "email" }   # SIEMPRE 200 (anti enumeración); manda link por email
+POST /auth/reset-password    { "token", "password" }   # token de 1 uso, vence en 1 h
+```
+
+El link del email apunta a `FRONTEND_URL/reset-password?token=...`. La nueva
+contraseña debe cumplir las mismas reglas del registro.
+
+---
+
 ## Email Verification
 
 ```http

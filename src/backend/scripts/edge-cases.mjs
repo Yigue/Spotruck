@@ -1,5 +1,10 @@
 // Testeo integral de caminos infelices y edge cases contra el servidor real:
 // validaciones, permisos, transiciones inválidas, dobles acciones y concurrencia.
+import { execSync } from 'child_process'
+
+const sql = (q) =>
+  execSync(`sudo -u postgres psql -t -A spottruck -c "${q.replace(/"/g, '\\"')}"`, { encoding: 'utf8' }).trim()
+
 const B = 'http://localhost:4000/api/v1'
 let passed = 0
 let failed = 0
@@ -179,6 +184,32 @@ r = await api('GET', '/trips/00000000-0000-0000-0000-000000000000', CO)
 check('viaje inexistente → 404', r.status === 404)
 r = await api('GET', '/trips/id-no-uuid', CO)
 check('id malformado no rompe (500 NO)', r.status !== 500)
+
+// ════════ E8: Reset de contraseña ════════
+console.log('\nE8 — Reset de contraseña')
+r = await api('POST', '/auth/forgot-password', null, { email: 'no-existe@nunca.com' })
+check('email inexistente responde 200 igual (anti enumeración)', r.status === 200)
+const resetEmail = `reset-${Date.now()}@test.com`
+await api('POST', '/auth/register', null, { email: resetEmail, password: 'Password1', role: 'DRIVER' })
+r = await api('POST', '/auth/forgot-password', null, { email: resetEmail })
+check('forgot-password con usuario real → 200', r.status === 200)
+const resetToken = sql(`SELECT password_reset_token FROM users WHERE email='${resetEmail}'`)
+check('token de reset generado con expiración', resetToken.length > 10)
+r = await api('POST', '/auth/reset-password', null, { token: 'token-falso', password: 'Password2' })
+check('token inválido → 400', r.status === 400)
+r = await api('POST', '/auth/reset-password', null, { token: resetToken, password: 'debil' })
+check('contraseña débil en el reset → 400', r.status === 400)
+r = await api('POST', '/auth/reset-password', null, { token: resetToken, password: 'NuevaPass1' })
+check('reset con token válido OK', r.status === 200 && r.body.data.reset === true)
+r = await api('POST', '/auth/login', null, { email: resetEmail, password: 'NuevaPass1' })
+check('login con la contraseña nueva', r.status === 200)
+r = await api('POST', '/auth/login', null, { email: resetEmail, password: 'Password1' })
+check('la contraseña vieja ya no sirve → 401', r.status === 401)
+r = await api('POST', '/auth/reset-password', null, { token: resetToken, password: 'OtraPass1' })
+check('token de un solo uso (reuso → 400)', r.status === 400)
+sql(`UPDATE users SET password_reset_expires = NOW() - INTERVAL '1 minute', password_reset_token='tok-vencido' WHERE email='${resetEmail}'`)
+r = await api('POST', '/auth/reset-password', null, { token: 'tok-vencido', password: 'OtraPass1' })
+check('token vencido → 400', r.status === 400)
 
 console.log(`\n${'═'.repeat(50)}`)
 console.log(`RESULTADO: ${passed} ✓ | ${failed} ✗`)

@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
@@ -42,14 +43,14 @@ export const auctionService = {
     if (!auction) throw errors.notFound('Auction')
 
     let winnerId: string | null = null
-    let winningAmount: number | null = null
+    let winningAmount: Prisma.Decimal | null = null
     let winningBidId: string | null = null
 
     if (auction.type === 'OPEN' || auction.type === 'SEALED') {
       // Reverse auction: lowest price wins. SEALED also uses lowest.
       const winningBid = auction.bids[0] // sorted ASC, lowest first
       if (winningBid) {
-        if (auction.reservePrice && winningBid.amount > auction.reservePrice) {
+        if (auction.reservePrice && new Prisma.Decimal(winningBid.amount).gt(auction.reservePrice)) {
           // Reserve not met - no winner
         } else {
           winnerId = winningBid.userId
@@ -127,7 +128,7 @@ export const auctionService = {
     if (!user) throw errors.notFound('User')
     if (user.role !== 'DRIVER') throw errors.forbidden('Only drivers can bid')
 
-    if (amount >= auction.currentPrice) {
+    if (new Prisma.Decimal(auction.currentPrice).lte(amount)) {
       throw errors.badRequest(`Bid must be lower than current price ${auction.currentPrice}`)
     }
 

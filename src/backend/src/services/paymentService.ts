@@ -1,12 +1,12 @@
 import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
+import { Prisma } from '@prisma/client'
 import { mercadopagoService } from './mercadopagoService.js'
 import { notificationService } from './notificationService.js'
 
-// Redondeo a centavos: los montos viven en Float (Double) — esto evita el
-// drift de coma flotante. Migración a Decimal pendiente para producción.
-const round2 = (n: number) => Math.round(n * 100) / 100
+// Aritmética de dinero con Decimal (acepta number o Decimal de Prisma)
+const D = (v: Prisma.Decimal | number) => new Prisma.Decimal(v)
 
 export const paymentService = {
   async createHold(tripId: string, driverId: string) {
@@ -19,9 +19,9 @@ export const paymentService = {
     const auction = await prisma.auction.findUnique({ where: { tripId } })
     if (!auction) throw errors.notFound('Auction for this trip')
 
-    const amount = round2(auction.currentPrice)
-    const platformFee = round2(amount * config.payment.platformFeePercent)
-    const netAmount = round2(amount - platformFee)
+    const amount = D(auction.currentPrice).toDecimalPlaces(2)
+    const platformFee = amount.mul(config.payment.platformFeePercent).toDecimalPlaces(2)
+    const netAmount = amount.minus(platformFee)
     const holdExpiresAt = new Date(Date.now() + config.payment.holdDurationHours * 60 * 60 * 1000)
 
     // Con MercadoPago configurado el pago nace PENDING y pasa a HELD cuando
@@ -45,7 +45,7 @@ export const paymentService = {
         const preference = await mercadopagoService.createPreference({
           paymentId: payment.id,
           title: `Flete ${trip.originAddress} → ${trip.destAddress}`,
-          amount,
+          amount: amount.toNumber(),
           payerEmail: trip.user.email,
         })
         const updated = await prisma.payment.update({
@@ -96,7 +96,7 @@ export const paymentService = {
       penaltyPercent = 0.30
     }
 
-    return trip.basePrice * penaltyPercent
+    return D(trip.basePrice).mul(penaltyPercent).toDecimalPlaces(2)
   },
 
   async processRefund(paymentId: string, _reason: string) {

@@ -33,6 +33,21 @@ export const emailService = {
     }
   },
 
+  passwordResetEmailHtml(resetUrl: string): string {
+    return `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#1B5E20">Restablecer contraseña 🔑</h2>
+        <p>Recibimos un pedido para restablecer tu contraseña de Spottruck. El link vence en 1 hora:</p>
+        <p style="text-align:center;margin:24px 0">
+          <a href="${resetUrl}"
+             style="background:#1B5E20;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold">
+            Crear nueva contraseña
+          </a>
+        </p>
+        <p style="color:#757575;font-size:12px">Si no fuiste vos, ignorá este correo: tu contraseña no cambia.</p>
+      </div>`
+  },
+
   verificationEmailHtml(verifyUrl: string): string {
     return `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">

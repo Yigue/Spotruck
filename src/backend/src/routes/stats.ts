@@ -60,7 +60,7 @@ router.get('/me', authenticate, async (req, res, next) => {
         month: m,
         amount: releasedPayments
           .filter((p) => monthKey(p.createdAt) === m)
-          .reduce((sum, p) => sum + p.netAmount, 0),
+          .reduce((sum, p) => sum + Number(p.netAmount), 0),
         trips: releasedPayments.filter((p) => monthKey(p.createdAt) === m).length,
       }))
 
@@ -80,7 +80,7 @@ router.get('/me', authenticate, async (req, res, next) => {
             bidsTotal,
             bidsAccepted: bids.ACCEPTED ?? 0,
             acceptanceRate: bidsTotal > 0 ? (bids.ACCEPTED ?? 0) / bidsTotal : 0,
-            totalIncome: releasedPayments.reduce((sum, p) => sum + p.netAmount, 0),
+            totalIncome: releasedPayments.reduce((sum, p) => sum + Number(p.netAmount), 0),
           },
           incomeByMonth,
           bidsByStatus: bids,
@@ -111,7 +111,7 @@ router.get('/me', authenticate, async (req, res, next) => {
       trips: trips.filter((t) => monthKey(t.createdAt) === m).length,
       spend: payments
         .filter((p) => monthKey(p.createdAt) === m)
-        .reduce((sum, p) => sum + p.amount, 0),
+        .reduce((sum, p) => sum + Number(p.amount), 0),
     }))
 
     const byCargoType = ['BULK', 'PALLETS', 'GENERAL', 'REFRIGERATED'].map((type) => ({
@@ -130,7 +130,7 @@ router.get('/me', authenticate, async (req, res, next) => {
         kpis: {
           tripsPublished: trips.length,
           tripsSettled: trips.filter((t) => t.status === 'SETTLED').length,
-          totalSpend: payments.reduce((sum, p) => sum + p.amount, 0),
+          totalSpend: payments.reduce((sum, p) => sum + Number(p.amount), 0),
           totalKm: trips.reduce((sum, t) => sum + (t.distanceKm ?? 0), 0),
           ratingAvg: user?.ratingAvg ?? 0,
           ratingCount: user?.ratingCount ?? 0,
