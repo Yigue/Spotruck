@@ -26,9 +26,8 @@ const formatTime = (dateString: string) => {
 }
 
 export function BidHistory({ bids }: BidHistoryProps) {
-  const sortedBids = [...bids].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )
+  // Subasta inversa: gana el MENOR precio — se ordena por monto ascendente
+  const sortedBids = [...bids].sort((a, b) => a.amount - b.amount)
 
   if (bids.length === 0) {
     return (
@@ -64,7 +63,7 @@ export function BidHistory({ bids }: BidHistoryProps) {
           </div>
           {index === 0 && (
             <span className="text-xs bg-success/10 text-success px-2 py-0.5 rounded">
-              Mayor
+              Mejor oferta
             </span>
           )}
         </div>

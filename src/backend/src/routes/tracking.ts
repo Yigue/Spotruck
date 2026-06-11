@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
+import { broadcastToTrip } from '../websocket/index.js'
 import { authenticate } from '../middleware/auth.js'
 
 const router = Router()
@@ -51,6 +52,17 @@ router.post('/:tripId', authenticate, async (req, res, next) => {
       return next(errors.badRequest('Trip not in progress'))
     }
 
+    // Solo el transportista asignado (oferta aceptada) puede reportar posición
+    if (req.user!.role !== 'ADMIN') {
+      const acceptedBid = await prisma.bid.findFirst({
+        where: { auction: { tripId: trip.id }, status: 'ACCEPTED' },
+        select: { userId: true },
+      })
+      if (acceptedBid?.userId !== req.user!.sub) {
+        return next(errors.forbidden('You are not assigned to this trip'))
+      }
+    }
+
     const log = await prisma.trackingLog.create({
       data: {
         tripId: req.params.tripId as string,
@@ -65,6 +77,15 @@ router.post('/:tripId', authenticate, async (req, res, next) => {
     if (trip.status === 'ASSIGNED') {
       await prisma.trip.update({ where: { id: req.params.tripId as string }, data: { status: 'IN_PROGRESS' } })
     }
+
+    broadcastToTrip(trip.id, {
+      type: 'tracking_update',
+      lat,
+      lng,
+      speed,
+      heading,
+      recordedAt: log.recordedAt.toISOString(),
+    })
 
     res.status(201).json({ data: log })
   } catch (err) {

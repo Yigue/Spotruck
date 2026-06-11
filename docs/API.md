@@ -150,12 +150,14 @@ POST /auctions/:id/bid
 Authorization: Bearer <accessToken>
 Content-Type: application/json
 
-{ "amount": 45000 }
+{ "amount": 45000, "note": "Tengo factura A", "truckId": "uuid" }
 ```
 
 - **Reverse auction:** bids must be LOWER than current price
 - Anti-sniping: extends auction by 5 min if bid placed in last 5 min
 - Max 3 extensions per auction
+- `note` (optional): aclaración del transportista
+- `truckId` (optional): camión de la flota propia; se valida propiedad, que esté activo y que la capacidad cubra el peso de la carga
 
 **Response `201`:**
 ```json
@@ -165,14 +167,132 @@ Content-Type: application/json
     "auctionId": "uuid",
     "userId": "uuid",
     "amount": 45000,
+    "note": "Tengo factura A",
+    "status": "PENDING",
+    "truckId": "uuid",
     "createdAt": "2026-06-04T..."
   }
 }
 ```
 
+### Accept / Reject Bid (empresa)
+```http
+PATCH /bids/:id
+Authorization: Bearer <accessToken>  (COMPANY dueña del viaje)
+Content-Type: application/json
+
+{ "action": "accept" }
+```
+
+- `accept`: cierra la subasta, rechaza las demás ofertas, asigna el viaje (`ASSIGNED`) y crea el hold de pago
+- `reject`: marca la oferta como `REJECTED` y notifica al transportista
+
+---
+
+## Trip Lifecycle (stepper)
+
+Estados: `ASSIGNED` (Preparando) → `IN_PROGRESS` (En viaje) → `DELIVERED` (Esperando confirmación) → `SETTLED` (Finalizada)
+
+```http
+POST /trips/:id/start             # DRIVER asignado: ASSIGNED → IN_PROGRESS
+POST /trips/:id/finish            # DRIVER asignado: IN_PROGRESS → DELIVERED
+POST /trips/:id/confirm-delivery  # COMPANY dueña: DELIVERED → SETTLED (libera el pago)
+```
+
+---
+
+## Trucks (flota del transportista)
+
+```http
+GET    /trucks        # flota propia (DRIVER)
+POST   /trucks        # { "plate", "type", "capacityKg", "preferredCargo?", "senasaNumber?", "insurance?" }
+PUT    /trucks/:id
+DELETE /trucks/:id    # baja lógica (active=false) si el camión tiene ofertas asociadas
+```
+
+`type`: `JAULA | SEMI | TOLVA | BATEA | FURGON | REFRIGERADO | PLAYO | OTRO`
+
+---
+
+## Notifications
+
+```http
+GET   /notifications            # propias, paginadas; meta incluye "unread"
+PATCH /notifications/:id/read
+POST  /notifications/read-all
+```
+
+`type`: `NEW_BID | BID_ACCEPTED | BID_REJECTED | TRIP_STATE | AUCTION_CLOSED | PAYMENT_PENDING | PAYMENT_HELD | DOCUMENTS_REVIEWED`
+
+---
+
+## Verificación de transportistas (revisión admin)
+
+```http
+POST  /users/me/request-verification   (DRIVER) requiere licencia + ≥1 camión cargado
+GET   /users?role=DRIVER&documentsStatus=PENDING   (ADMIN) lista pendientes
+PATCH /users/:id/verify                (ADMIN) { "action": "approve" | "reject", "note?" }
+```
+
+`documentsStatus`: `NONE → PENDING → APPROVED | REJECTED`. Los perfiles
+con `APPROVED` muestran la insignia "✓ Verificado".
+
+---
+
+## Stats
+
+```http
+GET /stats/me        # estadísticas de los últimos 6 meses según el rol
+```
+
+- **COMPANY**: publicaciones y gasto por mes, distribución por tipo de carga, KPIs
+- **DRIVER**: ingresos netos por mes, ofertas por estado, tasa de aceptación, KPIs
+- Ambos: distribución de valoraciones recibidas
+
+---
+
+## Password Reset
+
+```http
+POST /auth/forgot-password   { "email" }   # SIEMPRE 200 (anti enumeración); manda link por email
+POST /auth/reset-password    { "token", "password" }   # token de 1 uso, vence en 1 h
+```
+
+El link del email apunta a `FRONTEND_URL/reset-password?token=...`. La nueva
+contraseña debe cumplir las mismas reglas del registro.
+
+---
+
+## Email Verification
+
+```http
+POST /auth/verify-email          { "token": "<token del link del email>" }
+POST /auth/resend-verification   (auth) reenvía el link de verificación
+```
+
+Al registrarse se envía un email con el link `FRONTEND_URL/verify-email?token=...`.
+Sin `RESEND_API_KEY` configurada, el email se loguea en la consola del servidor.
+
 ---
 
 ## Payments
+
+El flujo de pago depende de la configuración:
+
+- **Con `MERCADOPAGO_ACCESS_TOKEN`**: al aceptar una oferta el pago nace
+  `PENDING` con un `paymentUrl` (Checkout Pro). Cuando la empresa paga,
+  MercadoPago notifica al webhook y el pago pasa a `HELD` (custodia).
+- **Sin credenciales (modo simulado)**: el pago nace `HELD` directamente.
+
+En ambos casos, `HELD → RELEASED` ocurre cuando la empresa confirma la
+entrega (`POST /trips/:id/confirm-delivery`).
+
+### Webhook MercadoPago
+```http
+POST /payments/webhook            (lo llama MercadoPago, sin auth)
+```
+Configurar en el panel de MP apuntando a `API_URL/api/v1/payments/webhook`.
+Si `MERCADOPAGO_WEBHOOK_SECRET` está seteado se valida la firma `x-signature`.
 
 ### Hold Payment
 ```http
@@ -243,10 +363,29 @@ Content-Type: application/json
 }
 ```
 
-### Subscribe to Trip
-```ws
-ws://localhost:4000/tracking/subscribe/:tripId
+## WebSocket (tiempo real)
+
 ```
+ws://localhost:4000/ws?token=<accessToken>
+```
+
+Al conectar, el servidor suscribe automáticamente al canal personal
+`user:<id>` (notificaciones). Suscripción explícita a subastas y viajes:
+
+```json
+{ "type": "subscribe", "payload": { "channel": "auction", "id": "<auctionId>" } }
+{ "type": "subscribe", "payload": { "channel": "trip", "id": "<tripId>" } }
+{ "type": "unsubscribe", "payload": { "channel": "trip", "id": "<tripId>" } }
+```
+
+Mensajes que emite el servidor:
+
+| type | Canal | Cuándo |
+|---|---|---|
+| `auction_update` | auction | nueva oferta (trae `currentPrice`, `endTime`) o cierre (`status: SETTLED`) |
+| `trip_update` | trip | cambio de estado del viaje (`status`) |
+| `tracking_update` | trip | nueva posición GPS (`lat`, `lng`, `speed`, `recordedAt`) |
+| `notification` | user | notificación in-app nueva (trae el objeto `notification`) |
 
 ---
 

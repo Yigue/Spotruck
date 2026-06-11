@@ -5,7 +5,7 @@ export default {
     extend: {
       colors: {
         primary: { DEFAULT: '#1B5E20', 50: '#E8F5E9', 100: '#C8E6C9', 500: '#388E3C', 700: '#1B5E20', 900: '#0A3A0A' },
-        secondary: { DEFAULT: '#212121', 50: '#F5F5F5', 500: '#616161', 900: '#212121' },
+        secondary: { DEFAULT: '#212121', 50: '#F5F5F5', 300: '#BDBDBD', 400: '#9E9E9E', 500: '#616161', 900: '#212121' },
         accent: { DEFAULT: '#FF6D00', 50: '#FFF3E0', 500: '#FF6D00', 700: '#E65100' },
         surface: '#FFFFFF',
         background: '#FAFAFA',

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import api from '../utils/api'
 import { useAuthStore } from '../hooks/useAuthStore'
 
@@ -32,8 +32,9 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="label">Email</label>
+            <label htmlFor="login-email" className="label">Email</label>
             <input
+              id="login-email"
               type="email"
               className="input"
               value={email}
@@ -43,8 +44,9 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="label">Contraseña</label>
+            <label htmlFor="login-password" className="label">Contraseña</label>
             <input
+              id="login-password"
               type="password"
               className="input"
               value={password}
@@ -52,6 +54,11 @@ export default function LoginPage() {
               placeholder="••••••••"
               required
             />
+          </div>
+          <div className="text-right">
+            <Link to="/forgot-password" className="text-xs text-primary font-medium">
+              ¿Olvidaste tu contraseña?
+            </Link>
           </div>
           <button
             type="submit"
@@ -70,5 +77,3 @@ export default function LoginPage() {
     </div>
   )
 }
-
-import { Link } from 'react-router-dom'

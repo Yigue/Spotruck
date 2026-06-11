@@ -1,5 +1,6 @@
 import { Card } from '../ui/Card'
 import { Badge } from '../ui/Badge'
+import { AuctionCountdown } from './AuctionCountdown'
 
 interface AuctionCardProps {
   auction: {
@@ -21,27 +22,18 @@ const formatPrice = (price: number) => {
   }).format(price)
 }
 
-const getTimeRemaining = (endTime: string): string => {
-  const end = new Date(endTime).getTime()
-  const now = Date.now()
-  const diff = end - now
-
-  if (diff <= 0) return 'Finalizada'
-
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-
-  if (hours > 24) {
-    const days = Math.floor(hours / 24)
-    return `${days}d ${hours % 24}h`
-  }
-  return `${hours}h ${minutes}m`
-}
-
 const typeLabels = {
   OPEN: 'Abierta',
   DUTCH: 'Holandesa',
   SEALED: 'Cerrada',
+}
+
+const statusInfo: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'default' }> = {
+  PENDING: { label: 'Pendiente', variant: 'warning' },
+  OPEN: { label: 'En subasta', variant: 'success' },
+  CLOSED: { label: 'Cerrada', variant: 'default' },
+  SETTLED: { label: 'Adjudicada', variant: 'info' },
+  CANCELLED: { label: 'Cancelada', variant: 'error' },
 }
 
 export function AuctionCard({ auction, trip, onClick }: AuctionCardProps) {
@@ -62,19 +54,17 @@ export function AuctionCard({ auction, trip, onClick }: AuctionCardProps) {
         {/* Type and status badges */}
         <div className="flex items-center gap-2">
           <Badge variant="accent">{typeLabels[auction.type]}</Badge>
-          <Badge variant={auction.status === 'ACTIVE' ? 'success' : 'default'}>
-            {auction.status}
+          <Badge variant={statusInfo[auction.status]?.variant ?? 'default'}>
+            {statusInfo[auction.status]?.label ?? auction.status}
           </Badge>
         </div>
 
-        {/* Current price */}
+        {/* Current price + countdown en vivo */}
         <div className="flex items-center justify-between">
           <span className="text-2xl font-mono font-bold text-accent">
             {formatPrice(auction.currentPrice)}
           </span>
-          <span className="text-xs text-secondary-500">
-            {getTimeRemaining(auction.endTime)}
-          </span>
+          <AuctionCountdown endTime={auction.endTime} status={auction.status} />
         </div>
 
         {/* Bid count */}

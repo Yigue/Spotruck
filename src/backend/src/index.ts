@@ -2,6 +2,8 @@ import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
+import rateLimit from 'express-rate-limit'
+import { Prisma } from '@prisma/client'
 import { createServer } from 'http'
 import { config } from './config/index.js'
 import { errorHandler } from './middleware/errorHandler.js'
@@ -12,10 +14,23 @@ import { auctionsRouter } from './routes/auctions.js'
 import { paymentsRouter } from './routes/payments.js'
 import { ratingsRouter } from './routes/ratings.js'
 import { trackingRouter } from './routes/tracking.js'
+import { trucksRouter } from './routes/trucks.js'
+import { bidsRouter } from './routes/bids.js'
+import { notificationsRouter } from './routes/notifications.js'
+import { statsRouter } from './routes/stats.js'
 import { setupWebSocket } from './websocket/index.js'
+import { startAuctionCron } from './jobs/auctionCron.js'
 
 const app = express()
 const server = createServer(app)
+
+// Los montos viven en Decimal(12,2): se serializan como number en JSON para
+// que el frontend no cambie. (this[key] es el valor original, antes de toJSON)
+app.set('json replacer', function (this: Record<string, unknown>, key: string, value: unknown) {
+  const original = this[key]
+  if (Prisma.Decimal.isDecimal(original)) return Number(original)
+  return value
+})
 
 // Middleware
 app.use(helmet())
@@ -27,14 +42,26 @@ app.use(express.urlencoded({ extended: true }))
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
+// Rate limiting en auth (fuerza bruta de login/register)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: config.nodeEnv === 'production' ? 30 : 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 // Routes
-app.use('/api/v1/auth', authRouter)
+app.use('/api/v1/auth', authLimiter, authRouter)
 app.use('/api/v1/users', usersRouter)
 app.use('/api/v1/trips', tripsRouter)
 app.use('/api/v1/auctions', auctionsRouter)
 app.use('/api/v1/payments', paymentsRouter)
 app.use('/api/v1/ratings', ratingsRouter)
 app.use('/api/v1/tracking', trackingRouter)
+app.use('/api/v1/trucks', trucksRouter)
+app.use('/api/v1/bids', bidsRouter)
+app.use('/api/v1/notifications', notificationsRouter)
+app.use('/api/v1/stats', statsRouter)
 
 // 404
 app.use((_, res) => res.status(404).json({ error: 'Not found' }))
@@ -49,6 +76,7 @@ const wss = setupWebSocket(server)
 // Start server
 server.listen(config.port, () => {
   console.log(`Server running on port ${config.port}`)
+  startAuctionCron()
 })
 
 export { app }

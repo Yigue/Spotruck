@@ -16,6 +16,7 @@ interface Auction {
   endTime: string
   bids?: { id: string }[]
   trip?: {
+    id: string
     originAddress: string
     destAddress: string
   }
@@ -66,11 +67,10 @@ export default function AuctionPage() {
   }, [statusFilter, typeFilter])
 
   const handleAuctionClick = (auctionId: string) => {
-    // Find the trip associated with this auction to navigate
+    // Directo al detalle del viaje (la subasta vive ahí)
     const auction = auctions.find((a) => a.id === auctionId)
-    if (auction?.trip) {
-      // Navigate to trip detail which shows auction info
-      navigate(`/trips?auction=${auctionId}`)
+    if (auction?.trip?.id) {
+      navigate(`/trips/${auction.trip.id}`)
     }
   }
 

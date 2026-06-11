@@ -1,6 +1,10 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
+import { paymentService } from './paymentService.js'
+import { notificationService } from './notificationService.js'
+import { broadcastToAuction, broadcastToTrip } from '../websocket/index.js'
 
 export const auctionService = {
   async startAuction(tripId: string) {
@@ -24,25 +28,34 @@ export const auctionService = {
   },
 
   async closeAuction(auctionId: string) {
+    // Lock optimista: evita la adjudicación simultánea con la aceptación
+    // manual de la empresa (o un cierre doble del cron)
+    const locked = await prisma.auction.updateMany({
+      where: { id: auctionId, status: 'OPEN' },
+      data: { status: 'SETTLED' },
+    })
+    if (locked.count === 0) throw errors.badRequest('Auction is not OPEN')
+
     const auction = await prisma.auction.findUnique({
       where: { id: auctionId },
       include: { trip: true, bids: { orderBy: { amount: 'asc' } } },
     })
     if (!auction) throw errors.notFound('Auction')
-    if (auction.status !== 'OPEN') throw errors.badRequest('Auction is not OPEN')
 
     let winnerId: string | null = null
-    let winningAmount: number | null = null
+    let winningAmount: Prisma.Decimal | null = null
+    let winningBidId: string | null = null
 
     if (auction.type === 'OPEN' || auction.type === 'SEALED') {
       // Reverse auction: lowest price wins. SEALED also uses lowest.
       const winningBid = auction.bids[0] // sorted ASC, lowest first
       if (winningBid) {
-        if (auction.reservePrice && winningBid.amount > auction.reservePrice) {
+        if (auction.reservePrice && new Prisma.Decimal(winningBid.amount).gt(auction.reservePrice)) {
           // Reserve not met - no winner
         } else {
           winnerId = winningBid.userId
           winningAmount = winningBid.amount
+          winningBidId = winningBid.id
         }
       }
     } else if (auction.type === 'DUTCH') {
@@ -51,31 +64,51 @@ export const auctionService = {
       if (winningBid) {
         winnerId = winningBid.userId
         winningAmount = winningBid.amount
+        winningBidId = winningBid.id
       }
     }
 
-    if (winnerId && winningAmount !== null) {
-      // Create payment hold for winner
-      const platformFee = winningAmount * config.payment.platformFeePercent
-      const netAmount = winningAmount - platformFee
-      const holdExpiresAt = new Date(Date.now() + config.payment.holdDurationHours * 60 * 60 * 1000)
-
-      await prisma.payment.create({
-        data: {
-          tripId: auction.tripId,
-          userId: winnerId,
-          amount: winningAmount,
-          platformFee,
-          netAmount,
-          status: 'HELD',
-          holdExpiresAt,
-        },
-      })
-
-      await prisma.trip.update({ where: { id: auction.tripId }, data: { status: 'ASSIGNED' } })
+    if (winningBidId) {
+      await prisma.$transaction([
+        prisma.bid.update({ where: { id: winningBidId }, data: { status: 'ACCEPTED' } }),
+        prisma.bid.updateMany({
+          where: { auctionId, id: { not: winningBidId }, status: 'PENDING' },
+          data: { status: 'REJECTED' },
+        }),
+      ])
     }
 
-    await prisma.auction.update({ where: { id: auctionId }, data: { status: 'SETTLED' } })
+    if (winnerId && winningAmount !== null) {
+      // currentPrice = monto ganador (createHold lo usa para calcular el pago)
+      await prisma.auction.update({
+        where: { id: auctionId },
+        data: { currentPrice: winningAmount },
+      })
+      // Lógica de pago unificada en paymentService (misma que la aceptación manual)
+      await paymentService.createHold(auction.tripId, winnerId)
+      await prisma.trip.update({ where: { id: auction.tripId }, data: { status: 'ASSIGNED' } })
+    } else {
+      // Venció sin adjudicar (sin ofertas o sin alcanzar la reserva): el viaje
+      // no puede quedar zombie en AUCTION — se cancela y se avisa a la empresa
+      await prisma.bid.updateMany({
+        where: { auctionId, status: 'PENDING' },
+        data: { status: 'REJECTED' },
+      })
+      await prisma.trip.update({ where: { id: auction.tripId }, data: { status: 'CANCELLED' } })
+      await notificationService.createInApp(
+        auction.trip.userId,
+        'AUCTION_CLOSED',
+        'Tu publicación venció sin adjudicar',
+        auction.bids.length === 0
+          ? `${auction.trip.originAddress} → ${auction.trip.destAddress} no recibió ofertas. Podés crear una nueva publicación ajustando el precio o las fechas`
+          : 'Las ofertas no alcanzaron el precio de reserva. Podés volver a publicar el viaje',
+        { tripId: auction.tripId }
+      )
+      broadcastToTrip(auction.tripId, { type: 'trip_update', status: 'CANCELLED' })
+    }
+
+    broadcastToAuction(auctionId, { status: 'SETTLED', winnerId, winningAmount })
+    if (winnerId) broadcastToTrip(auction.tripId, { type: 'trip_update', status: 'ASSIGNED' })
 
     return { auctionId, winnerId, winningAmount }
   },
@@ -95,7 +128,7 @@ export const auctionService = {
     if (!user) throw errors.notFound('User')
     if (user.role !== 'DRIVER') throw errors.forbidden('Only drivers can bid')
 
-    if (amount >= auction.currentPrice) {
+    if (new Prisma.Decimal(auction.currentPrice).lte(amount)) {
       throw errors.badRequest(`Bid must be lower than current price ${auction.currentPrice}`)
     }
 

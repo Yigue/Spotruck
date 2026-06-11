@@ -8,7 +8,7 @@ function uniqueEmail(prefix: string) {
   return `${prefix}_${Date.now()}@test.com`
 }
 
-async function registerCompany(email: string, password = 'password123') {
+async function registerCompany(email: string, password = 'Password123') {
   const res = await request(app).post(`${API}/auth/register`).send({
     email,
     password,
@@ -19,7 +19,7 @@ async function registerCompany(email: string, password = 'password123') {
   return res.body.data.accessToken as string
 }
 
-async function registerDriver(email: string, password = 'password123') {
+async function registerDriver(email: string, password = 'Password123') {
   const res = await request(app).post(`${API}/auth/register`).send({
     email,
     password,
@@ -85,9 +85,10 @@ describe('Trips CRUD Flow', () => {
         destAddress: validTripPayload.destAddress,
         cargoType: 'GENERAL',
         basePrice: validTripPayload.basePrice,
-        status: 'DRAFT',
+        status: 'AUCTION',
       })
       expect(res.body.data.id).toBeDefined()
+      expect(res.body.data.auction).toMatchObject({ status: 'OPEN' })
     })
 
     it('returns 403 when a driver tries to create a trip', async () => {
@@ -252,7 +253,7 @@ describe('Trips CRUD Flow', () => {
       const createRes = await request(app)
         .post(`${API}/trips`)
         .set('Authorization', `Bearer ${companyToken}`)
-        .send(validTripPayload)
+        .send({ ...validTripPayload, draft: true })
       tripId = createRes.body.data.id
     })
 
@@ -330,7 +331,7 @@ describe('Trips CRUD Flow', () => {
       const createRes = await request(app)
         .post(`${API}/trips`)
         .set('Authorization', `Bearer ${companyToken}`)
-        .send(validTripPayload)
+        .send({ ...validTripPayload, draft: true })
       tripId = createRes.body.data.id
     })
 

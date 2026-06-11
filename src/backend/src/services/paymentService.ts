@@ -1,19 +1,32 @@
 import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
+import { Prisma } from '@prisma/client'
+import { mercadopagoService } from './mercadopagoService.js'
+import { notificationService } from './notificationService.js'
+
+// Aritmética de dinero con Decimal (acepta number o Decimal de Prisma)
+const D = (v: Prisma.Decimal | number) => new Prisma.Decimal(v)
 
 export const paymentService = {
   async createHold(tripId: string, driverId: string) {
-    const trip = await prisma.trip.findUnique({ where: { id: tripId } })
+    const trip = await prisma.trip.findUnique({
+      where: { id: tripId },
+      include: { user: { select: { id: true, email: true } } },
+    })
     if (!trip) throw errors.notFound('Trip')
 
     const auction = await prisma.auction.findUnique({ where: { tripId } })
     if (!auction) throw errors.notFound('Auction for this trip')
 
-    const amount = auction.currentPrice
-    const platformFee = amount * config.payment.platformFeePercent
-    const netAmount = amount - platformFee
+    const amount = D(auction.currentPrice).toDecimalPlaces(2)
+    const platformFee = amount.mul(config.payment.platformFeePercent).toDecimalPlaces(2)
+    const netAmount = amount.minus(platformFee)
     const holdExpiresAt = new Date(Date.now() + config.payment.holdDurationHours * 60 * 60 * 1000)
+
+    // Con MercadoPago configurado el pago nace PENDING y pasa a HELD cuando
+    // la empresa paga (webhook). Sin credenciales: modo simulado, HELD directo.
+    const useMP = mercadopagoService.isConfigured()
 
     const payment = await prisma.payment.create({
       data: {
@@ -22,10 +35,35 @@ export const paymentService = {
         amount,
         platformFee,
         netAmount,
-        status: 'HELD',
+        status: useMP ? 'PENDING' : 'HELD',
         holdExpiresAt,
       },
     })
+
+    if (useMP) {
+      try {
+        const preference = await mercadopagoService.createPreference({
+          paymentId: payment.id,
+          title: `Flete ${trip.originAddress} → ${trip.destAddress}`,
+          amount: amount.toNumber(),
+          payerEmail: trip.user.email,
+        })
+        const updated = await prisma.payment.update({
+          where: { id: payment.id },
+          data: { mercadopagoId: preference.id, paymentUrl: preference.initPoint },
+        })
+        await notificationService.createInApp(
+          trip.userId,
+          'PAYMENT_PENDING',
+          'Pagá el viaje para confirmar al transportista',
+          `El pago de ${amount} ARS queda en custodia hasta que confirmes la entrega`,
+          { tripId, paymentId: payment.id, paymentUrl: preference.initPoint }
+        )
+        return updated
+      } catch (err) {
+        console.error('[MP] No se pudo crear la preferencia de pago:', err)
+      }
+    }
 
     return payment
   },
@@ -58,7 +96,7 @@ export const paymentService = {
       penaltyPercent = 0.30
     }
 
-    return trip.basePrice * penaltyPercent
+    return D(trip.basePrice).mul(penaltyPercent).toDecimalPlaces(2)
   },
 
   async processRefund(paymentId: string, _reason: string) {

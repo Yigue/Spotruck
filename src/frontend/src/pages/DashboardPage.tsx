@@ -18,72 +18,44 @@ interface Trip {
   auction?: { currentPrice: number; status: string }
 }
 
-interface UserStats {
-  tripsActive: number
-  tripsCompleted: number
-  auctionsWon: number
-  pendingBids: number
+interface StatsKpis {
+  // empresa
+  tripsPublished?: number
+  tripsSettled?: number
+  totalSpend?: number
+  // transportista
+  tripsCompleted?: number
+  totalIncome?: number
+  bidsTotal?: number
+  bidsAccepted?: number
+  acceptanceRate?: number
+  // ambos
+  ratingAvg?: number
+  ratingCount?: number
 }
+
+const formatPrice = (n: number) =>
+  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
-  const [stats, setStats] = useState<UserStats>({
-    tripsActive: 0,
-    tripsCompleted: 0,
-    auctionsWon: 0,
-    pendingBids: 0,
-  })
+  const [kpis, setKpis] = useState<StatsKpis>({})
   const [recentTrips, setRecentTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
-      const [meResult, assignedResult, inProgressResult, settledResult, recentResult] =
-        await Promise.allSettled([
-          api.get('/users/me'),
-          api.get('/trips', { params: { status: 'ASSIGNED', limit: 1 } }),
-          api.get('/trips', { params: { status: 'IN_PROGRESS', limit: 1 } }),
-          api.get('/trips', { params: { status: 'SETTLED', limit: 1 } }),
-          api.get('/trips', { params: { limit: 5 } }),
-        ])
+      const [statsResult, recentResult] = await Promise.allSettled([
+        api.get('/stats/me'),
+        api.get('/trips', { params: { limit: 5 } }),
+      ])
 
-      const tripsActive =
-        (assignedResult.status === 'fulfilled'
-          ? assignedResult.value.data.meta?.total ?? 0
-          : 0) +
-        (inProgressResult.status === 'fulfilled'
-          ? inProgressResult.value.data.meta?.total ?? 0
-          : 0)
-
-      const auctionsWon =
-        settledResult.status === 'fulfilled'
-          ? settledResult.value.data.meta?.total ?? 0
-          : 0
-
-      if (meResult.status === 'fulfilled') {
-        const userData = meResult.value.data.data
-        setStats({
-          tripsActive,
-          tripsCompleted: userData.tripsCompleted ?? 0,
-          auctionsWon,
-          // No /me/bids endpoint exists yet; show 0 until backend exposes it.
-          pendingBids: 0,
-        })
-      } else {
-        setStats({
-          tripsActive,
-          tripsCompleted: 0,
-          auctionsWon,
-          pendingBids: 0,
-        })
+      if (statsResult.status === 'fulfilled') {
+        setKpis(statsResult.value.data.data.kpis ?? {})
       }
-
       if (recentResult.status === 'fulfilled') {
         setRecentTrips(recentResult.value.data.data || [])
-      } else {
-        setError('Error al cargar datos')
       }
 
       setLoading(false)
@@ -107,30 +79,31 @@ export default function DashboardPage() {
       </h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Viajes activos"
-          value={stats.tripsActive}
-          icon="🚚"
-          color="primary"
-        />
-        <StatCard
-          label="Viajes completados"
-          value={stats.tripsCompleted}
-          icon="✅"
-          color="success"
-        />
-        <StatCard
-          label="Subastas ganadas"
-          value={stats.auctionsWon}
-          icon="🏆"
-          color="accent"
-        />
-        <StatCard
-          label="Pujas pendientes"
-          value={stats.pendingBids}
-          icon="🔨"
-          color="warning"
-        />
+        {user?.role === 'DRIVER' ? (
+          <>
+            <StatCard label="Viajes realizados" value={String(kpis.tripsCompleted ?? 0)} icon="🚚" color="primary" />
+            <StatCard label="Ingresos (6 meses)" value={formatPrice(kpis.totalIncome ?? 0)} icon="💰" color="success" />
+            <StatCard label="Ofertas aceptadas" value={`${kpis.bidsAccepted ?? 0} de ${kpis.bidsTotal ?? 0}`} icon="🏆" color="accent" />
+            <StatCard
+              label="Rating"
+              value={kpis.ratingCount ? `★ ${(kpis.ratingAvg ?? 0).toFixed(1)}` : '—'}
+              icon="⭐"
+              color="warning"
+            />
+          </>
+        ) : (
+          <>
+            <StatCard label="Publicaciones (6 meses)" value={String(kpis.tripsPublished ?? 0)} icon="📦" color="primary" />
+            <StatCard label="Viajes finalizados" value={String(kpis.tripsSettled ?? 0)} icon="✅" color="success" />
+            <StatCard label="Gasto en fletes" value={formatPrice(kpis.totalSpend ?? 0)} icon="💸" color="accent" />
+            <StatCard
+              label="Rating"
+              value={kpis.ratingCount ? `★ ${(kpis.ratingAvg ?? 0).toFixed(1)}` : '—'}
+              icon="⭐"
+              color="warning"
+            />
+          </>
+        )}
       </div>
 
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -174,7 +147,7 @@ function StatCard({
   color,
 }: {
   label: string
-  value: number
+  value: string
   icon: string
   color: string
 }) {

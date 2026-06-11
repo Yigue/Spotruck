@@ -210,15 +210,22 @@ describe('PaymentsService', () => {
 
   describe('GET /payments/:tripId', () => {
     it('returns payment for a trip', async () => {
+      // El endpoint ahora exige ser parte del pago (dueño del viaje,
+      // transportista que cobra o admin)
       const mockPayment = {
         id: 'payment-uuid-1',
         tripId: 'trip-uuid-1',
+        userId: 'driver-uuid-1',
         amount: 50000,
         status: 'HELD',
+        trip: { userId: 'company-uuid-1' },
       }
       ;(prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment)
 
-      const req = mockReq({}, { tripId: 'trip-uuid-1' })
+      const req = mockReq({}, { tripId: 'trip-uuid-1' }, {}, {
+        sub: 'company-uuid-1',
+        role: 'COMPANY',
+      })
       const res = mockRes()
       const next = mockNext()
 
@@ -227,8 +234,10 @@ describe('PaymentsService', () => {
 
       expect(prisma.payment.findFirst).toHaveBeenCalledWith({
         where: { tripId: 'trip-uuid-1' },
+        include: { trip: { select: { userId: true } } },
       })
-      expect(res.json).toHaveBeenCalledWith({ data: mockPayment })
+      const { trip: _trip, ...expected } = mockPayment
+      expect(res.json).toHaveBeenCalledWith({ data: expected })
     })
 
     it('returns 404 when payment not found for trip', async () => {

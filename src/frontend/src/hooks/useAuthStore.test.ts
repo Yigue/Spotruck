@@ -74,7 +74,8 @@ describe('useAuthStore', () => {
       state: { token: 'stored-token', refreshToken: 'stored-refresh', user },
     }))
     vi.resetModules()
-    const { useAuthStore: FreshStore } = await vi.importActual('./useAuthStore')
+    const { useAuthStore: FreshStore } =
+      await vi.importActual<typeof import('./useAuthStore')>('./useAuthStore')
     expect(FreshStore.getState().token).toBe('stored-token')
   })
 

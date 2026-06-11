@@ -1,18 +1,26 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState, useCallback } from 'react'
 import { TripDetailMap } from '../components/maps/TripDetailMap'
+import { LiveTrackingMap } from '../components/maps/LiveTrackingMap'
 import { AuctionCard } from '../components/auctions/AuctionCard'
+import { AuctionCountdown } from '../components/auctions/AuctionCountdown'
 import { BidForm } from '../components/auctions/BidForm'
-import { BidHistory } from '../components/auctions/BidHistory'
+import { BidList, type BidWithDetails } from '../components/auctions/BidList'
 import { RatingForm } from '../components/ratings/RatingForm'
+import { TripStatusStepper } from '../components/trips/TripStatusStepper'
+import { UserProfileModal } from '../components/users/UserProfileModal'
+import { PaymentCard } from '../components/payments/PaymentCard'
 import { EmptyState } from '../components/ui/EmptyState'
-import { Spinner } from '../components/ui/Spinner'
+import { Skeleton, SkeletonCard } from '../components/ui/Skeleton'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
+import { Modal } from '../components/ui/Modal'
 import { useAuthStore } from '../hooks/useAuthStore'
 import { useWebSocket } from '../hooks/useWebSocket'
+import { formatDuration } from '../utils/geo'
 import api from '../utils/api'
+import toast from 'react-hot-toast'
 
 interface Trip {
   id: string
@@ -22,16 +30,23 @@ interface Trip {
   destAddress: string
   destLat: number
   destLng: number
+  distanceKm?: number | null
+  durationMin?: number | null
   cargoType: string
   cargoDesc?: string
   weightKg?: number
+  volumeDesc?: string | null
   scheduledDate: string
+  endDate?: string | null
   basePrice: number
   status: string
   user: {
     id: string
     companyName?: string
+    companyCuit?: string
+    phone?: string
     ratingAvg: number
+    ratingCount?: number
   }
   auction?: {
     id: string
@@ -39,14 +54,9 @@ interface Trip {
     currentPrice: number
     status: string
     endTime: string
-    bids: {
-      id: string
-      amount: number
-      createdAt: string
-      user: { companyName?: string; ratingAvg: number }
-    }[]
+    bids: BidWithDetails[]
   }
-  hasRated?: boolean
+  ratings?: { fromUserId: string; toUserId: string; score: number }[]
 }
 
 const statusLabels: Record<string, string> = {
@@ -55,10 +65,17 @@ const statusLabels: Record<string, string> = {
   OPEN: 'Abierto',
   AUCTION: 'En subasta',
   ASSIGNED: 'Asignado',
-  IN_PROGRESS: 'En progreso',
-  DELIVERED: 'Entregado',
-  SETTLED: 'Liquidado',
+  IN_PROGRESS: 'En viaje',
+  DELIVERED: 'Esperando confirmación',
+  SETTLED: 'Finalizado',
   CANCELLED: 'Cancelado',
+}
+
+const cargoLabels: Record<string, string> = {
+  BULK: 'Granel',
+  PALLETS: 'Unitarizada (Pallets)',
+  GENERAL: 'General',
+  REFRIGERATED: 'Refrigerada',
 }
 
 const formatPrice = (price: number) => {
@@ -86,25 +103,66 @@ export default function TripDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showRating, setShowRating] = useState(false)
+  const [profileUserId, setProfileUserId] = useState<string | null>(null)
+  const [livePosition, setLivePosition] = useState<{
+    lat: number
+    lng: number
+    speed?: number | null
+    recordedAt: string
+  } | null>(null)
 
-  const handleWSMessage = useCallback((msg: { type: string; [key: string]: unknown }) => {
-    if (msg.type === 'auction_update' && id) {
-      // Refresh auction data when a new bid arrives
-      api.get(`/trips/${id}`).then(({ data }) => setTrip(data.data)).catch(() => {})
+  const refreshTrip = useCallback(async () => {
+    if (!id) return
+    try {
+      const { data } = await api.get(`/trips/${id}`)
+      setTrip(data.data)
+    } catch {
+      toast.error('No se pudo actualizar el viaje')
     }
   }, [id])
+
+  const publishTrip = async () => {
+    if (!id) return
+    try {
+      await api.post(`/trips/${id}/publish`)
+      toast.success('¡Publicación en subasta!')
+      refreshTrip()
+    } catch {
+      toast.error('No se pudo publicar el viaje')
+    }
+  }
+
+  const handleWSMessage = useCallback(
+    (msg: { type: string; [key: string]: unknown }) => {
+      if (msg.type === 'auction_update' || msg.type === 'trip_update') refreshTrip()
+      if (msg.type === 'tracking_update') {
+        setLivePosition({
+          lat: msg.lat as number,
+          lng: msg.lng as number,
+          speed: msg.speed as number | null,
+          recordedAt: msg.recordedAt as string,
+        })
+      }
+    },
+    [refreshTrip]
+  )
 
   const { subscribe } = useWebSocket(handleWSMessage)
 
   useEffect(() => {
     if (trip?.auction?.id) {
-      subscribe(trip.auction.id)
+      subscribe(trip.auction.id, 'auction')
     }
   }, [trip?.auction?.id, subscribe])
 
   useEffect(() => {
-    if (!id) return
+    if (trip?.id) {
+      subscribe(trip.id, 'trip')
+    }
+  }, [trip?.id, subscribe])
 
+  useEffect(() => {
+    if (!id) return
     const fetchTrip = async () => {
       try {
         const { data } = await api.get(`/trips/${id}`)
@@ -115,31 +173,18 @@ export default function TripDetailPage() {
         setLoading(false)
       }
     }
-
     fetchTrip()
   }, [id])
 
-  const handleBidPlaced = async () => {
-    if (!id) return
-    try {
-      const { data } = await api.get(`/trips/${id}`)
-      setTrip(data.data)
-    } catch {
-      // silently fail
-    }
-  }
-
-  const handleRated = () => {
-    setShowRating(false)
-    if (trip) {
-      setTrip({ ...trip, hasRated: true })
-    }
-  }
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner />
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
       </div>
     )
   }
@@ -158,15 +203,27 @@ export default function TripDetailPage() {
     )
   }
 
+  const isOwnerCompany = user?.id === trip.user?.id
+  const acceptedBid = trip.auction?.bids.find((b) => b.status === 'ACCEPTED')
+  const isAssignedDriver = !!acceptedBid && user?.id === acceptedBid.user.id
+
   const canShowBidForm =
     user?.role === 'DRIVER' &&
     trip.auction &&
     (trip.auction.status === 'OPEN' || trip.auction.status === 'PENDING')
 
-  const canShowRating =
-    (trip.status === 'DELIVERED' || trip.status === 'SETTLED') &&
-    !trip.hasRated &&
-    user?.id !== trip.user?.id
+  // A quién valora el usuario actual: el transportista valora a la empresa;
+  // la empresa valora al transportista asignado
+  const ratingTarget = isAssignedDriver
+    ? { id: trip.user.id, name: trip.user.companyName }
+    : isOwnerCompany && acceptedBid
+      ? { id: acceptedBid.user.id, name: acceptedBid.user.companyName }
+      : null
+
+  const hasRated = !!trip.ratings?.some((r) => r.fromUserId === user?.id)
+  const canShowRating = trip.status === 'SETTLED' && !!ratingTarget && !hasRated
+
+  const inLifecycle = ['ASSIGNED', 'IN_PROGRESS', 'DELIVERED', 'SETTLED'].includes(trip.status)
 
   return (
     <div className="space-y-6">
@@ -178,28 +235,70 @@ export default function TripDetailPage() {
           </Button>
           <h1 className="text-2xl font-bold">Detalle del viaje</h1>
         </div>
-        <Badge variant={trip.status === 'OPEN' ? 'success' : 'info'}>
-          {statusLabels[trip.status] || trip.status}
-        </Badge>
+        <div className="flex items-center gap-3">
+          {isOwnerCompany && trip.status === 'DRAFT' && (
+            <Button variant="accent" onClick={publishTrip}>
+              Publicar en subasta
+            </Button>
+          )}
+          <Badge variant={trip.status === 'AUCTION' ? 'success' : 'info'}>
+            {statusLabels[trip.status] || trip.status}
+          </Badge>
+        </div>
       </div>
 
-      {/* Map */}
-      <Card className="p-0 overflow-hidden">
-        <TripDetailMap
-          originLat={trip.originLat}
-          originLng={trip.originLng}
-          destLat={trip.destLat}
-          destLng={trip.destLng}
-          originAddress={trip.originAddress}
-          destAddress={trip.destAddress}
-        />
-      </Card>
+      {/* Stepper de estados (viaje asignado en adelante) */}
+      {inLifecycle && (
+        <Card>
+          <TripStatusStepper
+            tripId={trip.id}
+            status={trip.status}
+            isAssignedDriver={isAssignedDriver}
+            isOwnerCompany={isOwnerCompany}
+            onStatusChanged={refreshTrip}
+          />
+          {canShowRating && (
+            <div className="text-center mt-4 pt-4 border-t border-secondary-500/20">
+              <Button variant="accent" onClick={() => setShowRating(true)}>
+                Valorar
+              </Button>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Map: tracking en vivo durante el viaje, mapa estático antes */}
+      {['IN_PROGRESS', 'DELIVERED'].includes(trip.status) ? (
+        <Card>
+          <h2 className="text-lg font-bold mb-4">Seguimiento en vivo</h2>
+          <LiveTrackingMap
+            tripId={trip.id}
+            originLat={trip.originLat}
+            originLng={trip.originLng}
+            destLat={trip.destLat}
+            destLng={trip.destLng}
+            isAssignedDriver={isAssignedDriver && trip.status === 'IN_PROGRESS'}
+            livePosition={livePosition}
+          />
+        </Card>
+      ) : (
+        <Card className="p-0 overflow-hidden">
+          <TripDetailMap
+            originLat={trip.originLat}
+            originLng={trip.originLng}
+            destLat={trip.destLat}
+            destLng={trip.destLng}
+            originAddress={trip.originAddress}
+            destAddress={trip.destAddress}
+          />
+        </Card>
+      )}
 
       {/* Trip Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Route and cargo info */}
         <Card>
-          <h2 className="text-lg font-bold mb-4">Información del viaje</h2>
+          <h2 className="text-lg font-bold mb-4">Datos de la publicación</h2>
           <div className="space-y-4">
             <div>
               <p className="text-sm text-text-muted">Origen</p>
@@ -210,26 +309,54 @@ export default function TripDetailPage() {
               <p className="font-medium">{trip.destAddress}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
+              {trip.distanceKm && (
+                <div>
+                  <p className="text-sm text-text-muted">Distancia</p>
+                  <p className="font-medium">{trip.distanceKm.toLocaleString('es-AR')} km</p>
+                </div>
+              )}
+              {trip.durationMin && (
+                <div>
+                  <p className="text-sm text-text-muted">Duración del viaje</p>
+                  <p className="font-medium">{formatDuration(trip.durationMin)}</p>
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-text-muted">Tipo de carga</p>
-                <p className="font-medium">{trip.cargoType}</p>
+                <p className="font-medium">{cargoLabels[trip.cargoType] || trip.cargoType}</p>
               </div>
               {trip.weightKg && (
                 <div>
                   <p className="text-sm text-text-muted">Peso</p>
-                  <p className="font-medium">{trip.weightKg} kg</p>
+                  <p className="font-medium">{trip.weightKg.toLocaleString('es-AR')} kg</p>
                 </div>
               )}
             </div>
+            {trip.volumeDesc && (
+              <div>
+                <p className="text-sm text-text-muted">Volumen</p>
+                <p className="font-medium">{trip.volumeDesc}</p>
+              </div>
+            )}
             {trip.cargoDesc && (
               <div>
                 <p className="text-sm text-text-muted">Descripción</p>
                 <p className="font-medium">{trip.cargoDesc}</p>
               </div>
             )}
-            <div>
-              <p className="text-sm text-text-muted">Fecha programada</p>
-              <p className="font-medium">{formatDate(trip.scheduledDate)}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-text-muted">Fecha de inicio</p>
+                <p className="font-medium">{formatDate(trip.scheduledDate)}</p>
+              </div>
+              {trip.endDate && (
+                <div>
+                  <p className="text-sm text-text-muted">Fecha fin</p>
+                  <p className="font-medium">{formatDate(trip.endDate)}</p>
+                </div>
+              )}
             </div>
           </div>
         </Card>
@@ -256,77 +383,114 @@ export default function TripDetailPage() {
             </div>
           </Card>
 
+          {inLifecycle && (
+            <PaymentCard
+              tripId={trip.id}
+              isOwnerCompany={isOwnerCompany}
+              isAssignedDriver={isAssignedDriver}
+              tripStatus={trip.status}
+            />
+          )}
+
           {trip.user && (
             <Card>
               <h2 className="text-lg font-bold mb-4">Empresa</h2>
-              <div className="flex items-center gap-3">
-                <div>
+              <button
+                className="flex items-center gap-3 text-left w-full hover:bg-background rounded p-2 -m-2 transition-colors"
+                onClick={() => setProfileUserId(trip.user.id)}
+              >
+                <div className="flex-1">
                   <p className="font-medium">{trip.user.companyName || 'Sin nombre'}</p>
                   {trip.user.ratingAvg > 0 && (
                     <p className="text-sm text-warning">
                       ★ {trip.user.ratingAvg.toFixed(1)}
+                      {trip.user.ratingCount ? ` (${trip.user.ratingCount})` : ''}
                     </p>
                   )}
                 </div>
-              </div>
+                <span className="text-xs text-primary font-medium">Ver perfil →</span>
+              </button>
             </Card>
           )}
         </div>
       </div>
 
-      {/* Auction section */}
+      {/* Postulantes (vista empresa) / Subasta */}
       {trip.auction && (
         <Card>
-          <h2 className="text-lg font-bold mb-4">Subasta</h2>
-          <AuctionCard
-            auction={trip.auction}
-            trip={{ originAddress: trip.originAddress, destAddress: trip.destAddress }}
-          />
-
-          {/* Bid Form for drivers */}
-          {canShowBidForm && (
-            <div className="mt-6 pt-6 border-t border-secondary-500/20">
-              <h3 className="font-semibold mb-4">Realizar oferta</h3>
-              <BidForm
-                auctionId={trip.auction.id}
-                currentPrice={trip.auction.currentPrice}
-                onBidPlaced={handleBidPlaced}
+          {isOwnerCompany ? (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">Postulantes</h2>
+                <AuctionCountdown endTime={trip.auction.endTime} status={trip.auction.status} />
+              </div>
+              <BidList
+                bids={trip.auction.bids ?? []}
+                canDecide={trip.auction.status === 'OPEN'}
+                onDecided={refreshTrip}
               />
-            </div>
-          )}
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">Subasta</h2>
+                <AuctionCountdown endTime={trip.auction.endTime} status={trip.auction.status} />
+              </div>
+              <AuctionCard
+                auction={trip.auction}
+                trip={{ originAddress: trip.originAddress, destAddress: trip.destAddress }}
+              />
 
-          {/* Bid history */}
-          {trip.auction.bids && trip.auction.bids.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-secondary-500/20">
-              <h3 className="font-semibold mb-4">Historial de ofertas</h3>
-              <BidHistory bids={trip.auction.bids} />
-            </div>
+              {/* Postularse (transportista) */}
+              {canShowBidForm && (
+                <div className="mt-6 pt-6 border-t border-secondary-500/20">
+                  <h3 className="font-semibold mb-4">Postularse</h3>
+                  <BidForm
+                    auctionId={trip.auction.id}
+                    currentPrice={trip.auction.currentPrice}
+                    cargoWeightKg={trip.weightKg}
+                    onBidPlaced={refreshTrip}
+                  />
+                </div>
+              )}
+
+              {/* Mis ofertas en esta subasta */}
+              {user?.role === 'DRIVER' &&
+                (trip.auction.bids ?? []).some((b) => b.user.id === user.id) && (
+                  <div className="mt-6 pt-6 border-t border-secondary-500/20">
+                    <h3 className="font-semibold mb-4">Tus ofertas</h3>
+                    <BidList
+                      bids={(trip.auction.bids ?? []).filter((b) => b.user.id === user.id)}
+                      canDecide={false}
+                      onDecided={refreshTrip}
+                    />
+                  </div>
+                )}
+            </>
           )}
         </Card>
       )}
 
-      {/* Rating section */}
-      {canShowRating && !showRating && (
-        <Card className="text-center">
-          <p className="text-text-muted mb-4">
-            ¿Ya completaste este viaje? Califica a la empresa
-          </p>
-          <Button variant="accent" onClick={() => setShowRating(true)}>
-            Dejar una valoración
-          </Button>
-        </Card>
-      )}
-
-      {showRating && trip.user && (
-        <Card>
-          <h2 className="text-lg font-bold mb-4">Valorar a {trip.user.companyName}</h2>
+      {/* Modal de valoración */}
+      <Modal
+        open={showRating && !!ratingTarget}
+        onClose={() => setShowRating(false)}
+        title={`Valorar a ${ratingTarget?.name ?? ''}`}
+      >
+        {ratingTarget && (
           <RatingForm
             tripId={trip.id}
-            toUserId={trip.user.id}
-            onRated={handleRated}
+            toUserId={ratingTarget.id}
+            onRated={() => {
+              setShowRating(false)
+              refreshTrip()
+            }}
           />
-        </Card>
-      )}
+        )}
+      </Modal>
+
+      {/* Perfil público */}
+      <UserProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </div>
   )
 }

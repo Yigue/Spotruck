@@ -7,17 +7,29 @@ async function main() {
   console.log('🌱 Seeding Spottruck DB...')
 
   // Clean existing data
+  await prisma.notification.deleteMany()
   await prisma.trackingLog.deleteMany()
   await prisma.payment.deleteMany()
   await prisma.rating.deleteMany()
   await prisma.bid.deleteMany()
   await prisma.auction.deleteMany()
   await prisma.trip.deleteMany()
+  await prisma.truck.deleteMany()
   await prisma.user.deleteMany()
 
   const passwordHash = await bcrypt.hash('Demo1234!', 12)
 
   // ─── Users ──────────────────────────────────────────────────────────────────
+  await prisma.user.create({
+    data: {
+      email: 'admin@spottruck.com',
+      passwordHash,
+      role: 'ADMIN',
+      companyName: 'Spottruck Admin',
+      emailVerified: true,
+    },
+  })
+
   const company = await prisma.user.create({
     data: {
       email: 'empresa@demo.com',
@@ -44,9 +56,11 @@ async function main() {
       passwordHash,
       role: 'DRIVER',
       driverLicense: 'DNI 12345678',
+      phone: '+54 9 11 5555 0001',
       vehiclePlate: 'AB 123 CD',
       vehicleType: 'SEMIREMOLQUE',
       vehicleCapacity: 25000,
+      documentsStatus: 'APPROVED', // transportista verificado de ejemplo
     },
   })
 
@@ -56,6 +70,7 @@ async function main() {
       passwordHash,
       role: 'DRIVER',
       driverLicense: 'DNI 23456789',
+      phone: '+54 9 11 5555 0002',
       vehiclePlate: 'EF 456 GH',
       vehicleType: 'BASCULANTE',
       vehicleCapacity: 18000,
@@ -68,6 +83,7 @@ async function main() {
       passwordHash,
       role: 'DRIVER',
       driverLicense: 'DNI 34567890',
+      phone: '+54 9 11 5555 0003',
       vehiclePlate: 'IJ 789 KL',
       vehicleType: 'FURGÓN',
       vehicleCapacity: 12000,
@@ -77,6 +93,51 @@ async function main() {
   console.log('✅ Users created')
   console.log('   Companies:', company.email, company2.email)
   console.log('   Drivers:', driver1.email, driver2.email, driver3.email)
+
+  // ─── Trucks (flota por transportista) ──────────────────────────────────────
+  const truck1a = await prisma.truck.create({
+    data: {
+      ownerId: driver1.id,
+      plate: 'AB 123 CD',
+      type: 'SEMI',
+      capacityKg: 25000,
+      preferredCargo: 'BULK',
+    },
+  })
+
+  const truck1b = await prisma.truck.create({
+    data: {
+      ownerId: driver1.id,
+      plate: 'MN 321 OP',
+      type: 'JAULA',
+      capacityKg: 15000,
+      preferredCargo: 'GENERAL',
+      senasaNumber: 'SEN-004512',
+      insurance: { aseguradora: 'La Segunda', tipo: 'Carga total', monto: 5000000 },
+    },
+  })
+
+  const truck2a = await prisma.truck.create({
+    data: {
+      ownerId: driver2.id,
+      plate: 'EF 456 GH',
+      type: 'BATEA',
+      capacityKg: 18000,
+      preferredCargo: 'BULK',
+    },
+  })
+
+  const truck3a = await prisma.truck.create({
+    data: {
+      ownerId: driver3.id,
+      plate: 'IJ 789 KL',
+      type: 'FURGON',
+      capacityKg: 12000,
+      preferredCargo: 'REFRIGERATED',
+    },
+  })
+
+  console.log('✅ Trucks created:', truck1a.plate, truck1b.plate, truck2a.plate, truck3a.plate)
 
   // ─── Trips ──────────────────────────────────────────────────────────────────
   const now = new Date()
@@ -204,12 +265,14 @@ async function main() {
 
   console.log('✅ Auctions created:', auction1.id, auction2.id, auction3.id)
 
-  // ─── Bids (Bid model: id, auctionId, userId, amount, createdAt) ────────────
+  // ─── Bids (con camión, aclaración y estado) ─────────────────────────────────
   const bid1 = await prisma.bid.create({
     data: {
       auctionId: auction1.id,
       userId: driver1.id,
+      truckId: truck1a.id,
       amount: 53000,
+      note: 'Tengo factura A, vuelvo vacío de Buenos Aires',
     },
   })
 
@@ -217,7 +280,9 @@ async function main() {
     data: {
       auctionId: auction1.id,
       userId: driver2.id,
+      truckId: truck2a.id,
       amount: 51000,
+      note: 'Disponible desde el 19/06',
     },
   })
 
@@ -225,6 +290,7 @@ async function main() {
     data: {
       auctionId: auction1.id,
       userId: driver3.id,
+      truckId: truck3a.id,
       amount: 49000,
     },
   })
@@ -233,19 +299,44 @@ async function main() {
     data: {
       auctionId: auction2.id,
       userId: driver1.id,
+      truckId: truck1b.id,
       amount: 26500,
+      note: 'Jaula con Senasa al día',
     },
   })
 
-  // Closed auction bids
+  // Closed auction bids: driver1 ganó con 19500 (coincide con el payment)
   await prisma.bid.create({
-    data: { auctionId: auction3.id, userId: driver1.id, amount: 21000 },
+    data: { auctionId: auction3.id, userId: driver1.id, truckId: truck1a.id, amount: 19500, status: 'ACCEPTED' },
   })
   await prisma.bid.create({
-    data: { auctionId: auction3.id, userId: driver2.id, amount: 19500 },
+    data: { auctionId: auction3.id, userId: driver2.id, truckId: truck2a.id, amount: 21000, status: 'REJECTED' },
   })
 
   console.log('✅ Bids created')
+
+  // ─── Notifications ──────────────────────────────────────────────────────────
+  await prisma.notification.create({
+    data: {
+      userId: company.id,
+      type: 'NEW_BID',
+      title: 'Nueva oferta en tu publicación',
+      body: 'Un transportista ofreció 49000 ARS por Rosario → Buenos Aires',
+      payload: { tripId: trip1.id, auctionId: auction1.id, bidId: bid3.id },
+    },
+  })
+  await prisma.notification.create({
+    data: {
+      userId: driver1.id,
+      type: 'BID_ACCEPTED',
+      title: '¡Tu oferta fue aceptada!',
+      body: 'Te asignaron el viaje San Miguel → Tandil por 19500 ARS',
+      payload: { tripId: trip4.id },
+      readAt: new Date(),
+    },
+  })
+
+  console.log('✅ Notifications created')
 
   // ─── Ratings ────────────────────────────────────────────────────────────────
   await prisma.rating.create({

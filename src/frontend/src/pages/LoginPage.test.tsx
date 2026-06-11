@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
-import { useAuthStore } from '../hooks/useAuthStore'
 import api from '../utils/api'
 
 // Hoisted mock variables - safe inside vi.mock factories (no TDZ)

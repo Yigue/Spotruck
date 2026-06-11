@@ -8,6 +8,12 @@ import TripsPage from './pages/TripsPage'
 import TripDetailPage from './pages/TripDetailPage'
 import NewTripPage from './pages/NewTripPage'
 import AuctionPage from './pages/AuctionPage'
+import ExplorePage from './pages/ExplorePage'
+import ProfilePage from './pages/ProfilePage'
+import StatsPage from './pages/StatsPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -22,6 +28,9 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
@@ -30,6 +39,9 @@ export default function App() {
           <Route path="trips/:id" element={<TripDetailPage />} />
           <Route path="auctions" element={<AuctionPage />} />
           <Route path="auctions/:id" element={<AuctionPage />} />
+          <Route path="explore" element={<ExplorePage />} />
+          <Route path="stats" element={<StatsPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
