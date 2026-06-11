@@ -2,6 +2,7 @@ import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
 import { paymentService } from './paymentService.js'
+import { notificationService } from './notificationService.js'
 import { broadcastToAuction, broadcastToTrip } from '../websocket/index.js'
 
 export const auctionService = {
@@ -85,6 +86,24 @@ export const auctionService = {
       // Lógica de pago unificada en paymentService (misma que la aceptación manual)
       await paymentService.createHold(auction.tripId, winnerId)
       await prisma.trip.update({ where: { id: auction.tripId }, data: { status: 'ASSIGNED' } })
+    } else {
+      // Venció sin adjudicar (sin ofertas o sin alcanzar la reserva): el viaje
+      // no puede quedar zombie en AUCTION — se cancela y se avisa a la empresa
+      await prisma.bid.updateMany({
+        where: { auctionId, status: 'PENDING' },
+        data: { status: 'REJECTED' },
+      })
+      await prisma.trip.update({ where: { id: auction.tripId }, data: { status: 'CANCELLED' } })
+      await notificationService.createInApp(
+        auction.trip.userId,
+        'AUCTION_CLOSED',
+        'Tu publicación venció sin adjudicar',
+        auction.bids.length === 0
+          ? `${auction.trip.originAddress} → ${auction.trip.destAddress} no recibió ofertas. Podés crear una nueva publicación ajustando el precio o las fechas`
+          : 'Las ofertas no alcanzaron el precio de reserva. Podés volver a publicar el viaje',
+        { tripId: auction.tripId }
+      )
+      broadcastToTrip(auction.tripId, { type: 'trip_update', status: 'CANCELLED' })
     }
 
     broadcastToAuction(auctionId, { status: 'SETTLED', winnerId, winningAmount })

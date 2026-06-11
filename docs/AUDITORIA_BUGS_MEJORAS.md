@@ -85,12 +85,32 @@
 
 ---
 
+## Hallazgos posteriores — verificación de happy paths (2026-06-11) ✅ corregidos
+
+La suite end-to-end `src/backend/scripts/happy-paths.mjs` (46 aserciones sobre
+los 9 recorridos felices, contra el servidor real) destapó dos bugs más:
+
+1. **🔴 El cron de cierre de subastas nunca corría**: `jobs/auctionCron.ts` se
+   auto-iniciaba al importarse, pero ningún módulo lo importaba — las subastas
+   vencidas quedaban abiertas para siempre. Fix: `startAuctionCron()` exportado
+   y llamado desde `index.ts` al levantar el servidor.
+2. **🟠 Viaje zombie al vencer sin ofertas**: la subasta cerraba `SETTLED` pero
+   el viaje quedaba en `AUCTION` eternamente. Fix: pasa a `CANCELLED`, las
+   ofertas pendientes se rechazan y la empresa recibe una notificación con el
+   motivo (sin ofertas / reserva no alcanzada).
+
+Cómo correr la suite: `cd src/backend && node scripts/happy-paths.mjs`
+(requiere el server corriendo y la DB seedeada; HP9 espera el ciclo real del
+cron, tarda ~2-3 min).
+
+---
+
 ## Resumen
 
 | Severidad | Cantidad |
 |---|---|
-| 🔴 Crítico | 5 |
-| 🟠 Alto | 6 |
+| 🔴 Crítico | 5 + 1 (cron) |
+| 🟠 Alto | 6 + 1 (viaje zombie) |
 | 🟡 Medio | 6 |
 | 🔵 UX/Visual | 11 |
 

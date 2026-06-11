@@ -18,6 +18,7 @@ import { bidsRouter } from './routes/bids.js'
 import { notificationsRouter } from './routes/notifications.js'
 import { statsRouter } from './routes/stats.js'
 import { setupWebSocket } from './websocket/index.js'
+import { startAuctionCron } from './jobs/auctionCron.js'
 
 const app = express()
 const server = createServer(app)
@@ -66,6 +67,7 @@ const wss = setupWebSocket(server)
 // Start server
 server.listen(config.port, () => {
   console.log(`Server running on port ${config.port}`)
+  startAuctionCron()
 })
 
 export { app }
