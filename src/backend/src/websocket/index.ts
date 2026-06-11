@@ -76,28 +76,37 @@ export function setupWebSocket(server: Server) {
     })
   }, 30000)
 
-  wss.on('connection', (ws: AuthenticatedWebSocket, req) => {
-    // Parse token from query string: ws://host/ws?token=xxx
-    const url = new URL(req.url || '', `http://${req.headers.host}`)
-    const token = url.searchParams.get('token')
-
-    if (!token) {
-      ws.close(4001, 'Missing token')
-      return
-    }
-
+  // Autentica la conexión y abre el canal personal del usuario
+  function tryAuth(ws: AuthenticatedWebSocket, token: string): boolean {
     try {
       const payload = jwt.verify(token, config.jwt.secret) as { sub: string; role: string }
       ws.userId = payload.sub
       ws.userRole = payload.role
-      ws.isAlive = true
+      join(`user:${ws.userId}`, ws)
+      ws.send(JSON.stringify({ type: 'connected', userId: ws.userId }))
+      return true
     } catch {
       ws.close(4001, 'Invalid token')
-      return
+      return false
     }
+  }
 
-    // Canal personal para notificaciones
-    join(`user:${ws.userId}`, ws)
+  wss.on('connection', (ws: AuthenticatedWebSocket, req) => {
+    ws.isAlive = true
+
+    // Auth preferida: primer mensaje { type: 'auth', payload: { token } } —
+    // así el JWT no viaja en la URL (logs de proxies/servidores).
+    // Se mantiene ?token= por compatibilidad.
+    const url = new URL(req.url || '', `http://${req.headers.host}`)
+    const legacyToken = url.searchParams.get('token')
+    if (legacyToken) {
+      if (!tryAuth(ws, legacyToken)) return
+    } else {
+      const authTimeout = setTimeout(() => {
+        if (!ws.userId) ws.close(4001, 'Auth timeout')
+      }, 5000)
+      ws.once('close', () => clearTimeout(authTimeout))
+    }
 
     ws.on('pong', () => { ws.isAlive = true })
 
@@ -113,15 +122,23 @@ export function setupWebSocket(server: Server) {
     ws.on('close', () => {
       leaveAll(ws)
     })
-
-    // Send welcome
-    ws.send(JSON.stringify({ type: 'connected', userId: ws.userId }))
   })
 
   function handleMessage(
     ws: AuthenticatedWebSocket,
-    msg: { type: string; payload?: { channel?: string; id?: string; auctionId?: string } }
+    msg: { type: string; payload?: { channel?: string; id?: string; auctionId?: string; token?: string } }
   ) {
+    if (msg.type === 'auth') {
+      if (!ws.userId && msg.payload?.token) tryAuth(ws, msg.payload.token)
+      return
+    }
+
+    // Todo lo demás requiere conexión autenticada
+    if (!ws.userId) {
+      ws.send(JSON.stringify({ type: 'error', code: 'UNAUTHORIZED' }))
+      return
+    }
+
     switch (msg.type) {
       case 'subscribe': {
         // payload: { channel: 'auction' | 'trip', id } — se mantiene el

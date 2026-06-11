@@ -146,7 +146,12 @@ router.get('/:id/profile', authenticate, async (req, res, next) => {
       },
     })
     if (!user) return next(errors.notFound('User'))
-    res.json({ data: user })
+
+    // El teléfono de una empresa es contacto comercial (visible, como en la
+    // app original). El de un transportista solo lo ven empresas y admins.
+    const showPhone =
+      user.role === 'COMPANY' || ['COMPANY', 'ADMIN'].includes(req.user!.role)
+    res.json({ data: showPhone ? user : { ...user, phone: null } })
   } catch (err) {
     next(err)
   }

@@ -51,7 +51,39 @@ export function BidList({ bids, canDecide, onDecided }: BidListProps) {
 
   return (
     <>
-      <div className="overflow-x-auto">
+      {/* Cards apiladas en mobile */}
+      <div className="md:hidden space-y-3">
+        {bids.map((bid) => {
+          const badge = statusBadge[bid.status]
+          return (
+            <button
+              key={bid.id}
+              onClick={() => setSelected(bid)}
+              className="w-full text-left card p-3 flex items-center gap-3"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">
+                  {bid.user.companyName || 'Transportista'}
+                  {bid.user.ratingAvg > 0 && (
+                    <span className="text-warning text-xs ml-2">★ {bid.user.ratingAvg.toFixed(1)}</span>
+                  )}
+                </p>
+                <p className="text-xs text-text-muted">
+                  {bid.truck ? `${bid.truck.plate} · ` : ''}
+                  {new Date(bid.createdAt).toLocaleDateString('es-AR')}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="font-mono font-semibold text-accent">{formatPrice(bid.amount)}</p>
+                <Badge variant={badge.variant}>{badge.label}</Badge>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Tabla comparativa en desktop */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-text-muted border-b border-secondary-500/20">

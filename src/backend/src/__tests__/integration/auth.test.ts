@@ -36,7 +36,7 @@ describe('Auth Flow', () => {
         .post(`${API}/auth/register`)
         .send({
           email,
-          password: 'password123',
+          password: 'Password123',
           role: 'COMPANY',
           companyName: 'Acme SRL',
           companyCuit: '20-99999999-1',
@@ -60,7 +60,7 @@ describe('Auth Flow', () => {
         .post(`${API}/auth/register`)
         .send({
           email,
-          password: 'driverpass123',
+          password: 'Driverpass123',
           role: 'DRIVER',
           driverLicense: 'DL-123456',
           vehiclePlate: 'ABC-123',
@@ -76,11 +76,11 @@ describe('Auth Flow', () => {
       const email = uniqueEmail('reg_dup')
       const first = await request(app)
         .post(`${API}/auth/register`)
-        .send({ email, password: 'password123', role: 'COMPANY' })
+        .send({ email, password: 'Password123', role: 'COMPANY' })
 
       const dup = await request(app)
         .post(`${API}/auth/register`)
-        .send({ email, password: 'password123', role: 'COMPANY' })
+        .send({ email, password: 'Password123', role: 'COMPANY' })
 
       expect(first.status).toBe(201)
       expect(dup.status).toBe(409)
@@ -90,7 +90,7 @@ describe('Auth Flow', () => {
     it('returns 400 for invalid email', async () => {
       const res = await request(app)
         .post(`${API}/auth/register`)
-        .send({ email: 'not-an-email', password: 'password123', role: 'COMPANY' })
+        .send({ email: 'not-an-email', password: 'Password123', role: 'COMPANY' })
 
       expect(res.status).toBe(400)
     })
@@ -110,14 +110,14 @@ describe('Auth Flow', () => {
       const email = uniqueEmail('login_ok')
       await request(app).post(`${API}/auth/register`).send({
         email,
-        password: 'mypassword123',
+        password: 'myPassword123',
         role: 'COMPANY',
         companyName: 'Login Test Co',
       })
 
       const res = await request(app)
         .post(`${API}/auth/login`)
-        .send({ email, password: 'mypassword123' })
+        .send({ email, password: 'myPassword123' })
 
       expect(res.status).toBe(200)
       expect(res.body.data).toMatchObject({
@@ -158,7 +158,7 @@ describe('Auth Flow', () => {
       const email = uniqueEmail('refresh_ok')
       const regRes = await request(app).post(`${API}/auth/register`).send({
         email,
-        password: 'password123',
+        password: 'Password123',
         role: 'COMPANY',
       })
       const refreshToken = regRes.body.data.refreshToken
@@ -196,7 +196,7 @@ describe('Auth Flow', () => {
       const email = uniqueEmail('me_ok')
       const regRes = await request(app).post(`${API}/auth/register`).send({
         email,
-        password: 'password123',
+        password: 'Password123',
         role: 'COMPANY',
         companyName: 'Me Test Company',
         phone: '+549****1111',
@@ -236,7 +236,7 @@ describe('Auth Flow', () => {
       const email = uniqueEmail('logout_ok')
       const regRes = await request(app).post(`${API}/auth/register`).send({
         email,
-        password: 'password123',
+        password: 'Password123',
         role: 'COMPANY',
       })
       const accessToken = regRes.body.data.accessToken

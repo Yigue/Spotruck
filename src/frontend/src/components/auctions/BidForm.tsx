@@ -28,6 +28,9 @@ const formatPrice = (price: number) => {
   }).format(price)
 }
 
+// La oferta debe ser al menos 10% menor al precio actual (regla del backend)
+const MIN_BID_DECREMENT = 0.1
+
 export function BidForm({ auctionId, currentPrice, cargoWeightKg, onBidPlaced }: BidFormProps) {
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
@@ -35,6 +38,8 @@ export function BidForm({ auctionId, currentPrice, cargoWeightKg, onBidPlaced }:
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const maxAllowedBid = Math.floor(currentPrice * (1 - MIN_BID_DECREMENT))
 
   useEffect(() => {
     api
@@ -57,8 +62,8 @@ export function BidForm({ auctionId, currentPrice, cargoWeightKg, onBidPlaced }:
       return
     }
 
-    if (bidAmount >= currentPrice) {
-      setError(`La oferta debe ser menor a ${formatPrice(currentPrice)}`)
+    if (bidAmount > maxAllowedBid) {
+      setError(`La oferta debe ser de ${formatPrice(maxAllowedBid)} o menos (10% bajo el precio actual)`)
       return
     }
 
@@ -95,6 +100,9 @@ export function BidForm({ auctionId, currentPrice, cargoWeightKg, onBidPlaced }:
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="text-sm text-secondary-500">
         Precio actual: <span className="font-mono text-accent font-semibold">{formatPrice(currentPrice)}</span>
+        <span className="block text-xs mt-0.5">
+          Tu oferta debe ser de <span className="font-mono font-semibold">{formatPrice(maxAllowedBid)}</span> o menos
+        </span>
       </div>
 
       {trucks.length > 0 ? (

@@ -1,7 +1,22 @@
 # Auditoría — Bugs, Fallas y Mejoras (Visual + Funcional)
 
 **Fecha:** 2026-06-11 · **Rama:** `claude/optimistic-fermat-f62yt2`
-**Método:** revisión manual del código + barrido automatizado independiente. Sin cambios aplicados (solo diagnóstico).
+**Método:** revisión manual del código + barrido automatizado independiente.
+
+> **Estado (2026-06-11): ✅ TODO IMPLEMENTADO** salvo dos excepciones documentadas:
+> - **A5 (Float→Decimal):** mitigado con redondeo a centavos en todos los cálculos;
+>   la migración completa a `Decimal` queda recomendada antes de producción
+>   (toca serialización JSON y aritmética en backend+frontend).
+> - **UX-10 (reset de contraseña):** no existía el flujo; queda como feature nueva.
+>
+> Detalles de implementación: publicación nace en subasta (con `draft: true`
+> opcional + `POST /trips/:id/publish`), lock optimista en adjudicación,
+> autorización en pagos/tracking, teléfonos solo entre partes, WS con auth por
+> mensaje y conexión única compartida, webhook fail-closed en prod, reglas de
+> contraseña en backend, rate limiting en /auth, `endDate` = cierre de subasta,
+> dashboard por rol vía /stats/me, y toda la pasada visual (countdown en cards,
+> "Mejor oferta", mínimo visible al ofertar, sin fechas pasadas, skeletons,
+> postulantes responsive, contraste del sidebar, empty states).
 
 ---
 

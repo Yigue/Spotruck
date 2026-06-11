@@ -14,7 +14,13 @@ const router = Router()
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  // Mismas reglas que muestra el frontend: el backend es la autoridad
+  password: z
+    .string()
+    .min(8, 'La contraseña debe tener al menos 8 caracteres')
+    .regex(/[A-Z]/, 'La contraseña debe incluir una mayúscula')
+    .regex(/[a-z]/, 'La contraseña debe incluir una minúscula')
+    .regex(/\d/, 'La contraseña debe incluir un número'),
   role: z.enum(['COMPANY', 'DRIVER']),
   companyName: z.string().optional(),
   companyCuit: z.string().optional(),

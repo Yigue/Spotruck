@@ -11,7 +11,7 @@ import { TripStatusStepper } from '../components/trips/TripStatusStepper'
 import { UserProfileModal } from '../components/users/UserProfileModal'
 import { PaymentCard } from '../components/payments/PaymentCard'
 import { EmptyState } from '../components/ui/EmptyState'
-import { Spinner } from '../components/ui/Spinner'
+import { Skeleton, SkeletonCard } from '../components/ui/Skeleton'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
@@ -20,6 +20,7 @@ import { useAuthStore } from '../hooks/useAuthStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { formatDuration } from '../utils/geo'
 import api from '../utils/api'
+import toast from 'react-hot-toast'
 
 interface Trip {
   id: string
@@ -116,9 +117,20 @@ export default function TripDetailPage() {
       const { data } = await api.get(`/trips/${id}`)
       setTrip(data.data)
     } catch {
-      // silently fail
+      toast.error('No se pudo actualizar el viaje')
     }
   }, [id])
+
+  const publishTrip = async () => {
+    if (!id) return
+    try {
+      await api.post(`/trips/${id}/publish`)
+      toast.success('¡Publicación en subasta!')
+      refreshTrip()
+    } catch {
+      toast.error('No se pudo publicar el viaje')
+    }
+  }
 
   const handleWSMessage = useCallback(
     (msg: { type: string; [key: string]: unknown }) => {
@@ -166,8 +178,13 @@ export default function TripDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner />
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
       </div>
     )
   }
@@ -218,9 +235,16 @@ export default function TripDetailPage() {
           </Button>
           <h1 className="text-2xl font-bold">Detalle del viaje</h1>
         </div>
-        <Badge variant={trip.status === 'OPEN' ? 'success' : 'info'}>
-          {statusLabels[trip.status] || trip.status}
-        </Badge>
+        <div className="flex items-center gap-3">
+          {isOwnerCompany && trip.status === 'DRAFT' && (
+            <Button variant="accent" onClick={publishTrip}>
+              Publicar en subasta
+            </Button>
+          )}
+          <Badge variant={trip.status === 'AUCTION' ? 'success' : 'info'}>
+            {statusLabels[trip.status] || trip.status}
+          </Badge>
+        </div>
       </div>
 
       {/* Stepper de estados (viaje asignado en adelante) */}

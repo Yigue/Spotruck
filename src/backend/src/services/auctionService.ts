@@ -1,6 +1,7 @@
 import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
+import { paymentService } from './paymentService.js'
 import { broadcastToAuction, broadcastToTrip } from '../websocket/index.js'
 
 export const auctionService = {
@@ -25,12 +26,19 @@ export const auctionService = {
   },
 
   async closeAuction(auctionId: string) {
+    // Lock optimista: evita la adjudicación simultánea con la aceptación
+    // manual de la empresa (o un cierre doble del cron)
+    const locked = await prisma.auction.updateMany({
+      where: { id: auctionId, status: 'OPEN' },
+      data: { status: 'SETTLED' },
+    })
+    if (locked.count === 0) throw errors.badRequest('Auction is not OPEN')
+
     const auction = await prisma.auction.findUnique({
       where: { id: auctionId },
       include: { trip: true, bids: { orderBy: { amount: 'asc' } } },
     })
     if (!auction) throw errors.notFound('Auction')
-    if (auction.status !== 'OPEN') throw errors.badRequest('Auction is not OPEN')
 
     let winnerId: string | null = null
     let winningAmount: number | null = null
@@ -69,27 +77,15 @@ export const auctionService = {
     }
 
     if (winnerId && winningAmount !== null) {
-      // Create payment hold for winner
-      const platformFee = winningAmount * config.payment.platformFeePercent
-      const netAmount = winningAmount - platformFee
-      const holdExpiresAt = new Date(Date.now() + config.payment.holdDurationHours * 60 * 60 * 1000)
-
-      await prisma.payment.create({
-        data: {
-          tripId: auction.tripId,
-          userId: winnerId,
-          amount: winningAmount,
-          platformFee,
-          netAmount,
-          status: 'HELD',
-          holdExpiresAt,
-        },
+      // currentPrice = monto ganador (createHold lo usa para calcular el pago)
+      await prisma.auction.update({
+        where: { id: auctionId },
+        data: { currentPrice: winningAmount },
       })
-
+      // Lógica de pago unificada en paymentService (misma que la aceptación manual)
+      await paymentService.createHold(auction.tripId, winnerId)
       await prisma.trip.update({ where: { id: auction.tripId }, data: { status: 'ASSIGNED' } })
     }
-
-    await prisma.auction.update({ where: { id: auctionId }, data: { status: 'SETTLED' } })
 
     broadcastToAuction(auctionId, { status: 'SETTLED', winnerId, winningAmount })
     if (winnerId) broadcastToTrip(auction.tripId, { type: 'trip_update', status: 'ASSIGNED' })

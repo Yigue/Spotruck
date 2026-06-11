@@ -21,15 +21,19 @@ export const bidService = {
     if (bid.status !== 'PENDING') throw errors.badRequest('Bid is not PENDING')
     if (bid.auction.status !== 'OPEN') throw errors.badRequest('Auction is not OPEN')
 
+    // Lock optimista: solo un proceso (aceptación manual o cron de cierre)
+    // puede adjudicar la subasta — evita pagos duplicados
+    const locked = await prisma.auction.updateMany({
+      where: { id: bid.auctionId, status: 'OPEN' },
+      data: { status: 'SETTLED', currentPrice: bid.amount },
+    })
+    if (locked.count === 0) throw errors.conflict('La subasta ya fue cerrada o adjudicada')
+
     await prisma.$transaction([
       prisma.bid.update({ where: { id: bidId }, data: { status: 'ACCEPTED' } }),
       prisma.bid.updateMany({
         where: { auctionId: bid.auctionId, id: { not: bidId }, status: 'PENDING' },
         data: { status: 'REJECTED' },
-      }),
-      prisma.auction.update({
-        where: { id: bid.auctionId },
-        data: { status: 'SETTLED', currentPrice: bid.amount },
       }),
       prisma.trip.update({ where: { id: trip.id }, data: { status: 'ASSIGNED' } }),
     ])

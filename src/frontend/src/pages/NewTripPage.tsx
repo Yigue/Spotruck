@@ -50,6 +50,13 @@ interface PlaceSelection {
 
 const emptyPlace: PlaceSelection = { provinceId: '', provinceName: '', locality: null }
 
+// "ahora" en formato datetime-local (hora local), para min= y validación
+function nowLocalISO(): string {
+  const d = new Date()
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 16)
+}
+
 function PlaceSelector({
   label,
   provinces,
@@ -173,6 +180,8 @@ export default function NewTripPage() {
     if (!origin.locality) newErrors.origin = 'Seleccioná provincia y localidad de origen'
     if (!dest.locality) newErrors.dest = 'Seleccioná provincia y localidad de destino'
     if (!form.scheduledDate) newErrors.scheduledDate = 'Requerido'
+    else if (form.scheduledDate < nowLocalISO())
+      newErrors.scheduledDate = 'La fecha no puede estar en el pasado'
     if (form.endDate && form.scheduledDate && form.endDate < form.scheduledDate)
       newErrors.endDate = 'Debe ser posterior a la fecha de inicio'
     if (!form.basePrice || parseFloat(form.basePrice) <= 0) newErrors.basePrice = 'Precio inválido'
@@ -284,18 +293,21 @@ export default function NewTripPage() {
               label="Fecha de inicio"
               name="scheduledDate"
               type="datetime-local"
+              min={nowLocalISO()}
               value={form.scheduledDate}
               onChange={handleChange}
               error={errors.scheduledDate}
               required
             />
             <Input
-              label="Fecha fin (vencimiento de la publicación)"
+              label="Fecha fin (cierre de la subasta)"
               name="endDate"
               type="datetime-local"
+              min={form.scheduledDate || nowLocalISO()}
               value={form.endDate}
               onChange={handleChange}
               error={errors.endDate}
+              helper="Sin fecha fin, la subasta cierra a las 72 h"
             />
           </div>
 

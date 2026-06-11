@@ -90,6 +90,18 @@ export default function ExplorePage() {
             <Spinner />
           </div>
         )}
+        {!loading && trips.length === 0 && (
+          <div className="absolute inset-x-0 top-4 z-[1000] flex justify-center pointer-events-none">
+            <div className="bg-surface shadow-lg rounded-lg px-4 py-3 text-sm text-text-muted pointer-events-auto">
+              No hay viajes en subasta{cargoType ? ' para este tipo de carga' : ''} ahora mismo.{' '}
+              {cargoType && (
+                <button className="text-primary font-medium" onClick={() => setCargoType('')}>
+                  Ver todos
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <MapContainer
           center={[-34.6, -60.0]}
           zoom={6}

@@ -72,7 +72,19 @@ router.get('/:id', authenticate, async (req, res, next) => {
       },
     })
     if (!auction) return next(errors.notFound('Auction'))
-    res.json({ data: auction })
+
+    // Teléfonos de postulantes: solo para la empresa dueña del viaje
+    const isOwner = auction.trip.userId === req.user!.sub || req.user!.role === 'ADMIN'
+    const data = isOwner
+      ? auction
+      : {
+          ...auction,
+          bids: auction.bids.map((b) =>
+            b.user.id === req.user!.sub ? b : { ...b, user: { ...b.user, phone: null } }
+          ),
+        }
+
+    res.json({ data })
   } catch (err) {
     next(err)
   }
@@ -174,6 +186,12 @@ router.post('/:id/bid', authenticate, requireRole('DRIVER'), async (req, res, ne
 // GET /auctions/:id/bids
 router.get('/:id/bids', authenticate, async (req, res, next) => {
   try {
+    const auction = await prisma.auction.findUnique({
+      where: { id: req.params.id as string },
+      select: { trip: { select: { userId: true } } },
+    })
+    if (!auction) return next(errors.notFound('Auction'))
+
     const bids = await prisma.bid.findMany({
       where: { auctionId: req.params.id as string },
       orderBy: { createdAt: 'desc' },
@@ -182,7 +200,13 @@ router.get('/:id/bids', authenticate, async (req, res, next) => {
         truck: { select: { id: true, plate: true, type: true, capacityKg: true } },
       },
     })
-    res.json({ data: bids })
+
+    const isOwner = auction.trip.userId === req.user!.sub || req.user!.role === 'ADMIN'
+    const data = isOwner
+      ? bids
+      : bids.map((b) => (b.user.id === req.user!.sub ? b : { ...b, user: { ...b.user, phone: null } }))
+
+    res.json({ data })
   } catch (err) {
     next(err)
   }

@@ -52,6 +52,17 @@ router.post('/:tripId', authenticate, async (req, res, next) => {
       return next(errors.badRequest('Trip not in progress'))
     }
 
+    // Solo el transportista asignado (oferta aceptada) puede reportar posición
+    if (req.user!.role !== 'ADMIN') {
+      const acceptedBid = await prisma.bid.findFirst({
+        where: { auction: { tripId: trip.id }, status: 'ACCEPTED' },
+        select: { userId: true },
+      })
+      if (acceptedBid?.userId !== req.user!.sub) {
+        return next(errors.forbidden('You are not assigned to this trip'))
+      }
+    }
+
     const log = await prisma.trackingLog.create({
       data: {
         tripId: req.params.tripId as string,

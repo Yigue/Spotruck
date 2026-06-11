@@ -4,6 +4,7 @@ import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
 import { notificationService } from '../services/notificationService.js'
 import { paymentService } from '../services/paymentService.js'
+import { mercadopagoService } from '../services/mercadopagoService.js'
 import { broadcastToTrip } from '../websocket/index.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
 
@@ -29,6 +30,8 @@ const createTripSchema = z.object({
   scheduledDate: z.string().datetime(),
   endDate: z.string().datetime().optional(),
   basePrice: z.number().positive(),
+  // true = guardar como borrador (no entra en subasta todavía)
+  draft: z.boolean().optional(),
 })
 
 const updateTripSchema = createTripSchema.partial().strict()
@@ -99,25 +102,105 @@ router.get('/:id', authenticate, async (req, res, next) => {
       },
     })
     if (!trip) return next(errors.notFound('Trip'))
-    res.json({ data: trip })
+
+    // Los teléfonos de los postulantes solo los ve la empresa dueña del viaje
+    const isOwner = trip.userId === req.user!.sub || req.user!.role === 'ADMIN'
+    const data =
+      !isOwner && trip.auction
+        ? {
+            ...trip,
+            auction: {
+              ...trip.auction,
+              bids: trip.auction.bids.map((b) =>
+                b.user.id === req.user!.sub ? b : { ...b, user: { ...b.user, phone: null } }
+              ),
+            },
+          }
+        : trip
+
+    res.json({ data })
   } catch (err) {
     next(err)
   }
 })
 
-// POST /trips
+// La publicación nace "En Subasta" (como en la app original): la subasta
+// queda abierta hasta la fecha fin de la publicación (o 72h por defecto)
+const DEFAULT_AUCTION_HOURS = 72
+
+function auctionEndTime(endDate: Date | null | undefined): Date {
+  const fallback = new Date(Date.now() + DEFAULT_AUCTION_HOURS * 60 * 60 * 1000)
+  return endDate && endDate > new Date() ? endDate : fallback
+}
+
+// POST /trips — crea la publicación y abre la subasta en la misma transacción.
+// Con draft=true queda en borrador (sin subasta) para publicar después.
 router.post('/', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res, next) => {
   try {
-    const data = createTripSchema.parse(req.body)
-    const trip = await prisma.trip.create({
-      data: {
-        ...data,
-        userId: req.user!.sub,
-        scheduledDate: new Date(data.scheduledDate),
-        endDate: data.endDate ? new Date(data.endDate) : undefined,
-      },
+    const { draft, ...data } = createTripSchema.parse(req.body)
+
+    const trip = await prisma.$transaction(async (tx) => {
+      const created = await tx.trip.create({
+        data: {
+          ...data,
+          userId: req.user!.sub,
+          scheduledDate: new Date(data.scheduledDate),
+          endDate: data.endDate ? new Date(data.endDate) : undefined,
+          status: draft ? 'DRAFT' : 'AUCTION',
+        },
+      })
+      if (!draft) {
+        await tx.auction.create({
+          data: {
+            tripId: created.id,
+            type: 'OPEN',
+            startTime: new Date(),
+            endTime: auctionEndTime(created.endDate),
+            reservePrice: created.basePrice * 0.9,
+            currentPrice: created.basePrice,
+            status: 'OPEN',
+          },
+        })
+      }
+      return created
     })
-    res.status(201).json({ data: trip })
+
+    const withAuction = await prisma.trip.findUnique({
+      where: { id: trip.id },
+      include: { auction: { select: { id: true, status: true, endTime: true } } },
+    })
+    res.status(201).json({ data: withAuction })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /trips/:id/publish — publica un borrador: abre la subasta
+router.post('/:id/publish', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res, next) => {
+  try {
+    const trip = await prisma.trip.findUnique({ where: { id: req.params.id as string } })
+    if (!trip) return next(errors.notFound('Trip'))
+    if (trip.userId !== req.user!.sub && req.user!.role !== 'ADMIN') {
+      return next(errors.forbidden('Not your trip'))
+    }
+    if (trip.status !== 'DRAFT') return next(errors.badRequest('Only DRAFT trips can be published'))
+
+    const [updated] = await prisma.$transaction([
+      prisma.trip.update({ where: { id: trip.id }, data: { status: 'AUCTION' } }),
+      prisma.auction.create({
+        data: {
+          tripId: trip.id,
+          type: 'OPEN',
+          startTime: new Date(),
+          endTime: auctionEndTime(trip.endDate),
+          reservePrice: trip.basePrice * 0.9,
+          currentPrice: trip.basePrice,
+          status: 'OPEN',
+        },
+      }),
+    ])
+
+    res.json({ data: updated })
   } catch (err) {
     next(err)
   }
@@ -135,11 +218,15 @@ router.put('/:id', authenticate, async (req, res, next) => {
       return next(errors.badRequest('Cannot edit trip in current status'))
     }
 
-    const data = updateTripSchema.parse(req.body)
+    const { draft: _draft, ...data } = updateTripSchema.parse(req.body)
 
     const updated = await prisma.trip.update({
       where: { id: req.params.id as string },
-      data,
+      data: {
+        ...data,
+        scheduledDate: data.scheduledDate ? new Date(data.scheduledDate) : undefined,
+        endDate: data.endDate ? new Date(data.endDate) : undefined,
+      },
     })
     res.json({ data: updated })
   } catch (err) {
@@ -243,6 +330,17 @@ router.post('/:id/confirm-delivery', authenticate, requireRole('COMPANY', 'ADMIN
       return next(errors.forbidden('Not your trip'))
     }
     if (trip.status !== 'DELIVERED') return next(errors.badRequest('Trip must be DELIVERED to confirm'))
+
+    // Con MercadoPago activo, la empresa no puede finalizar el viaje si el
+    // pago sigue pendiente: el transportista quedaría sin cobrar
+    const pendingPayment = await prisma.payment.findFirst({
+      where: { tripId: trip.id, status: 'PENDING' },
+    })
+    if (pendingPayment && mercadopagoService.isConfigured()) {
+      return next(
+        errors.badRequest('El pago del viaje está pendiente: pagalo con MercadoPago antes de confirmar la entrega')
+      )
+    }
 
     const payment = await prisma.payment.findFirst({
       where: { tripId: trip.id, status: 'HELD' },

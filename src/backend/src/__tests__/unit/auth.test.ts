@@ -82,14 +82,14 @@ describe('AuthService', () => {
         .mockReturnValueOnce('access-token-fake')
         .mockReturnValueOnce('refresh-token-fake')
 
-      const req = mockReq({ email: 'new@example.com', password: 'password123', role: 'COMPANY', companyName: 'Acme' })
+      const req = mockReq({ email: 'new@example.com', password: 'Password123', role: 'COMPANY', companyName: 'Acme' })
       const res = mockRes()
       const next = mockNext()
 
       const handler = getHandler(authRouter, '/register')
       await handler(req, res, next)
 
-      expect(bcrypt.hash).toHaveBeenCalledWith('password123', 12)
+      expect(bcrypt.hash).toHaveBeenCalledWith('Password123', 12)
       expect(prisma.user.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           email: 'new@example.com', passwordHash: 'hashed', role: 'COMPANY', companyName: 'Acme',
@@ -108,7 +108,7 @@ describe('AuthService', () => {
     it('returns 409 when email already exists', async () => {
       ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'existing', email: 'taken@example.com' })
 
-      const req = mockReq({ email: 'taken@example.com', password: 'password123', role: 'COMPANY' })
+      const req = mockReq({ email: 'taken@example.com', password: 'Password123', role: 'COMPANY' })
       const res = mockRes()
       const next = mockNext()
 
@@ -125,7 +125,7 @@ describe('AuthService', () => {
     // The exact shape depends on the error handler implementation; trust the
     // integration tests for validation coverage.
     it.skip('returns 400 for invalid email format', async () => {
-      const req = mockReq({ email: 'not-an-email', password: 'password123', role: 'COMPANY' })
+      const req = mockReq({ email: 'not-an-email', password: 'Password123', role: 'COMPANY' })
       const res = mockRes()
       const next = mockNext()
 

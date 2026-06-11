@@ -86,7 +86,9 @@ export const mercadopagoService = {
     dataId?: string
   }): boolean {
     const secret = config.mercadopago.webhookSecret
-    if (!secret) return true
+    // Sin secret: solo se acepta en desarrollo. En producción es obligatorio
+    // configurar MERCADOPAGO_WEBHOOK_SECRET (fail-closed).
+    if (!secret) return config.nodeEnv !== 'production'
     if (!headers.signature || !headers.dataId) return false
 
     // Formato: "ts=<timestamp>,v1=<hmac>"

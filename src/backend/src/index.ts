@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
+import rateLimit from 'express-rate-limit'
 import { createServer } from 'http'
 import { config } from './config/index.js'
 import { errorHandler } from './middleware/errorHandler.js'
@@ -31,8 +32,16 @@ app.use(express.urlencoded({ extended: true }))
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
+// Rate limiting en auth (fuerza bruta de login/register)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: config.nodeEnv === 'production' ? 30 : 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 // Routes
-app.use('/api/v1/auth', authRouter)
+app.use('/api/v1/auth', authLimiter, authRouter)
 app.use('/api/v1/users', usersRouter)
 app.use('/api/v1/trips', tripsRouter)
 app.use('/api/v1/auctions', auctionsRouter)

@@ -92,9 +92,10 @@ router.post('/hold', authenticate, async (req, res, next) => {
     }
     if (trip.status !== 'AUCTION') return next(errors.badRequest('Trip must be in AUCTION status'))
 
-    const amount = trip.auction!.currentPrice
-    const platformFee = amount * config.payment.platformFeePercent
-    const netAmount = amount - platformFee
+    const round2 = (n: number) => Math.round(n * 100) / 100
+    const amount = round2(trip.auction!.currentPrice)
+    const platformFee = round2(amount * config.payment.platformFeePercent)
+    const netAmount = round2(amount - platformFee)
     const holdExpiresAt = new Date(Date.now() + config.payment.holdDurationHours * 60 * 60 * 1000)
 
     const payment = await prisma.payment.create({
@@ -144,14 +145,22 @@ router.post('/release', authenticate, async (req, res, next) => {
   }
 })
 
-// GET /payments/:tripId
+// GET /payments/:tripId — solo la empresa dueña del viaje, el transportista
+// que cobra o un admin pueden ver los montos
 router.get('/:tripId', authenticate, async (req, res, next) => {
   try {
     const payment = await prisma.payment.findFirst({
       where: { tripId: req.params.tripId as string },
+      include: { trip: { select: { userId: true } } },
     })
     if (!payment) return next(errors.notFound('Payment'))
-    res.json({ data: payment })
+
+    const requester = req.user!.sub
+    const isParty = payment.trip.userId === requester || payment.userId === requester
+    if (!isParty && req.user!.role !== 'ADMIN') return next(errors.forbidden())
+
+    const { trip: _trip, ...data } = payment
+    res.json({ data })
   } catch (err) {
     next(err)
   }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import api from '../utils/api'
 import { useAuthStore } from '../hooks/useAuthStore'
 
@@ -72,5 +72,3 @@ export default function LoginPage() {
     </div>
   )
 }
-
-import { Link } from 'react-router-dom'
