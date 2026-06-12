@@ -114,6 +114,7 @@ model User {
   passwordResetExpires DateTime? @map("password_reset_expires")
   // Revisión de documentación del transportista (licencia, cédula, seguro)
   documentsStatus DocumentsStatus @default(NONE) @map("documents_status")
+  driverLicenseUrl String? @map("driver_license_url")
   address        String?
   website        String?
   sector         String?
@@ -151,6 +152,7 @@ model Truck {
   // Documentación opcional (transporte de alimentos / seguro)
   senasaNumber    String?    @map("senasa_number")
   insurance       Json?      // { aseguradora, tipo, monto, vencimiento }
+  documentsUrl    String[]   @map("documents_url")
 
   active          Boolean    @default(true)
 

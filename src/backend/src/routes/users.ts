@@ -79,6 +79,24 @@ router.patch('/:id/verify', authenticate, requireRole('ADMIN'), async (req, res,
   }
 })
 
+// POST /users/me/documents — Subida de documentación (Placeholder para Fase 3)
+router.post('/me/documents', authenticate, async (req, res, next) => {
+  try {
+    // Acá iría la integración con multer + S3
+    // const fileUrl = await storageService.upload(req.file)
+    const fileUrl = 'https://fake-s3-bucket.com/uploads/driver_license_placeholder.jpg'
+
+    const updated = await prisma.user.update({
+      where: { id: req.user!.sub },
+      data: { driverLicenseUrl: fileUrl },
+      select: { id: true, driverLicenseUrl: true }
+    })
+    res.json({ data: updated })
+  } catch (err) {
+    next(err)
+  }
+})
+
 router.get('/me', authenticate, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.sub },

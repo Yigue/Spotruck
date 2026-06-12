@@ -55,6 +55,28 @@ router.post('/', authenticate, requireRole('DRIVER'), async (req, res, next) => 
   }
 })
 
+// POST /trucks/:id/documents — Subida de documentación del camión (Placeholder Fase 3)
+router.post('/:id/documents', authenticate, requireRole('DRIVER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const truck = await prisma.truck.findUnique({ where: { id: req.params.id as string } })
+    if (!truck) return next(errors.notFound('Truck'))
+    if (truck.ownerId !== req.user!.sub && req.user!.role !== 'ADMIN') {
+      return next(errors.forbidden())
+    }
+
+    // Acá iría la integración con multer + S3
+    const fileUrl = 'https://fake-s3-bucket.com/uploads/truck_doc_placeholder.jpg'
+
+    const updated = await prisma.truck.update({
+      where: { id: truck.id },
+      data: { documentsUrl: { push: fileUrl } }
+    })
+    res.json({ data: updated })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // PUT /trucks/:id
 router.put('/:id', authenticate, requireRole('DRIVER', 'ADMIN'), async (req, res, next) => {
   try {

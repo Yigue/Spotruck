@@ -220,4 +220,35 @@ router.get('/:id/bids', authenticate, async (req, res, next) => {
   }
 })
 
+// PATCH /auctions/:id/extend — la empresa dueña extiende la subasta manualmente
+router.patch('/:id/extend', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res, next) => {
+  try {
+    const { hours } = z.object({ hours: z.number().int().positive().max(72) }).parse(req.body)
+    const auctionId = req.params.id as string
+
+    const auction = await prisma.auction.findUnique({
+      where: { id: auctionId },
+      include: { trip: true }
+    })
+    if (!auction) return next(errors.notFound('Auction'))
+    if (auction.trip.userId !== req.user!.sub && req.user!.role !== 'ADMIN') {
+      return next(errors.forbidden('Not your trip'))
+    }
+    if (auction.status !== 'OPEN') return next(errors.badRequest('Auction is not open'))
+
+    const newEndTime = new Date(Math.max(auction.endTime.getTime(), Date.now()) + hours * 60 * 60 * 1000)
+
+    const updated = await prisma.auction.update({
+      where: { id: auctionId },
+      data: { endTime: newEndTime }
+    })
+
+    broadcastToAuction(auctionId, { endTime: newEndTime.toISOString() })
+
+    res.json({ data: updated })
+  } catch (err) {
+    next(err)
+  }
+})
+
 export { router as auctionsRouter }

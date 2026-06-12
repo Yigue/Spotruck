@@ -45,6 +45,9 @@ const tripWhereSchema = z.object({
   cargoType: z.enum(['BULK', 'PALLETS', 'GENERAL', 'REFRIGERATED']).optional(),
   minPrice: z.string().optional(),
   maxPrice: z.string().optional(),
+  lat: z.string().optional(),
+  lng: z.string().optional(),
+  radius: z.string().optional(),
   page: z.string().optional(),
   limit: z.string().optional(),
 })
@@ -52,14 +55,28 @@ const tripWhereSchema = z.object({
 // GET /trips
 router.get('/', authenticate, async (req, res, next) => {
   try {
-    const { status, cargoType, minPrice, maxPrice, page = '1', limit = '20' } = tripWhereSchema.parse(req.query)
-    const where: Record<string, unknown> = {}
+    const { status, cargoType, minPrice, maxPrice, lat, lng, radius, page = '1', limit = '20' } = tripWhereSchema.parse(req.query)
+    const where: Record<string, any> = {}
     if (status) where.status = status
     if (cargoType) where.cargoType = cargoType
     if (minPrice || maxPrice) {
       where.basePrice = {}
-      if (minPrice) (where.basePrice as Record<string, number>).gte = Number(minPrice)
-      if (maxPrice) (where.basePrice as Record<string, number>).lte = Number(maxPrice)
+      if (minPrice) where.basePrice.gte = Number(minPrice)
+      if (maxPrice) where.basePrice.lte = Number(maxPrice)
+    }
+
+    if (lat && lng && radius) {
+      const ids: Array<{ id: string }> = await prisma.$queryRaw`
+        SELECT id FROM trips
+        WHERE (
+          6371 * acos(
+            cos(radians(${Number(lat)})) * cos(radians(origin_lat)) *
+            cos(radians(origin_lng) - radians(${Number(lng)})) +
+            sin(radians(${Number(lat)})) * sin(radians(origin_lat))
+          )
+        ) <= ${Number(radius)}
+      `
+      where.id = { in: ids.map((x) => x.id) }
     }
 
     const [trips, total] = await Promise.all([
@@ -203,6 +220,60 @@ router.post('/:id/publish', authenticate, requireRole('COMPANY', 'ADMIN'), async
         },
       }),
     ])
+
+    res.json({ data: updated })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /trips/:id/cancel — la empresa cancela la publicación
+router.post('/:id/cancel', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res, next) => {
+  try {
+    const trip = await prisma.trip.findUnique({ 
+      where: { id: req.params.id as string },
+      include: { auction: true }
+    })
+    if (!trip) return next(errors.notFound('Trip'))
+    if (trip.userId !== req.user!.sub && req.user!.role !== 'ADMIN') {
+      return next(errors.forbidden('Not your trip'))
+    }
+    if (['IN_PROGRESS', 'DELIVERED', 'SETTLED', 'CANCELLED'].includes(trip.status)) {
+      return next(errors.badRequest('Cannot cancel trip in current status'))
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Cancel the trip
+      await tx.trip.update({ where: { id: trip.id }, data: { status: 'CANCELLED' } })
+
+      if (trip.auction) {
+        // 2. Cancel auction
+        await tx.auction.update({ where: { id: trip.auction.id }, data: { status: 'CANCELLED' } })
+        
+        // 3. Reject all pending/accepted bids
+        await tx.bid.updateMany({
+          where: { auctionId: trip.auction.id, status: { in: ['PENDING', 'ACCEPTED'] } },
+          data: { status: 'REJECTED' }
+        })
+      }
+
+      // 4. Refund held payment if any (trip was ASSIGNED)
+      if (trip.status === 'ASSIGNED') {
+        const payment = await tx.payment.findFirst({
+          where: { tripId: trip.id, status: 'HELD' }
+        })
+        if (payment) {
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: { status: 'REFUNDED' }
+          })
+          // In a real scenario, trigger MercadoPago refund API here
+        }
+      }
+    })
+
+    const updated = await prisma.trip.findUnique({ where: { id: trip.id } })
+    broadcastToTrip(trip.id, { type: 'trip_update', status: 'CANCELLED' })
 
     res.json({ data: updated })
   } catch (err) {
