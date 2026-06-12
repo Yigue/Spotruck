@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <title>Spotruck</title> -->
+    <link rel="icon" type="image/svg" href="../img/icono/truck3.svg">
+    <link rel="stylesheet" href="../css/Empresa/paginaEmpresa.css">
+    <title>Spotruck</title>
+</head>
+
+<body>
+    <div class="menu ocultar">
+        <div id="menu-close" class="nav-menu">
+            <img src="../img/system/cerrar.svg" width="40px">
+        </div>
+        <h1>MENU</h1>
+
+        <div class="menu-separador"></div>
+        <form action="../Control/empresa.php" method="POST">
+            <input type="submit" class="btn" id="btnPerfil" name="btnPerfil" value="Perfil">
+            <p></p>
+            <input type="submit" class="btn" id="btnMisPublis" name="btnMisPublis" value="Mis Publicaciones">
+            <p></p>
+            <input type="submit" class="btn" id="btnAyuda" name="btnAyuda" value="Ayuda">
+            <p></p>
+            <input type="submit" class="btn" id="btnLogout" name="btnLogout" value="Cerrar Sesion">
+
+        </form>
+
+
+    </div>
+
+    <header>
+
+        <div id="nav-menu">
+            <!-- <div class="nav-menu--img">
+                
+            </div> -->
+            <img class="nav-menu--img" src="../img/icono/menu.png" width="20px">
+        </div>
+
+        <div id="nav-logo">
+            <!-- <div class="nav-logo--img">
+                
+            </div> -->
+            <img class="nav-logo--img" src="../img/icono/truck.svg" width="20px">
+        </div>
+
+
+
+        
+        <div id="nav-section">
+            <!-- 
+            <h1>Spotruck</h1> -->
+        </div>
+    </header>
+
+    <nav>
+
+    </nav>
+
+    <content>
+
+        <h1>Publicar</h1>
+
+    </content>
+
+
+ 
+
+    <div class="window_container">
+        <form id="formularioPublicacion">
+            <label class="lbl" for="provinciaOrigen">Provincia Origen:</label>
+            <select class="txt" id="opProvinciasOrigen">
+                <!--  -->
+            </select>
+            <label class="lbl" for="localidadesOrigenLB" id="localidadesOrigenLB">Localidad Origen:</label>
+            <select class="txt" name="opLocalidadesOrigen" id="opLocalidadesOrigen">
+                <!--  -->
+            </select>
+
+            <label class="lbl" for="provinciaDestino">Provincia Destino:</label>
+            <select class="txt" id="opProvinciasDestino">
+                <!--  -->
+            </select>
+            <label class="lbl" for="localidadDestinoLB" id="localidadDestinoLB">Localidad Destino:</label>
+            <select class="txt" name="opLocalidadesDestino" id="opLocalidadesDestino">
+                <!--  -->
+            </select>
+
+            <label class="lbl" for="fechaInicio">Fecha Inicio:</label>
+            <input class="txt" type="date" id="fechaInicio" name="fechaInicio">
+
+            <label class="lbl" for="fechaFin">Fecha Fin:</label>
+            <input class="txt" type="date" id="fechaFin" name="fechaFin">
+
+            <label class="lbl" for="tipoDeCarga" id="tipoDeCargaLB">Tipo de Carga:</label>
+            <select class="txt" name="opTipoDeCarga" id="opTipoDeCarga">
+                <!--  -->
+            </select>
+
+            <label class="lbl" for="pesoCargamento">Peso Cargamento:</label>
+            <input class="txt" type="number" id="pesoCargamento" name="pesoCargamento"
+                placeholder="Cantidad en KG ej:1000">
+
+            <label class="lbl" for="">Volumen Cargamento:</label>
+            <input class="txt" type="text" id="volumenCargamento" name="volumenCargamento"
+                placeholder="Volumen de carga ej:10 Pallets">
+
+            <label class="lbl" for="Descripcion">Descripcion:</label>
+            <input class="txt" type="text" id="detalles" name="detalles"
+                placeholder="Descripcion a agregar Ej:Lo Necesito con Urgencia">
+
+            <!-- <textarea name="command" style="width: 382px; height: 247px;">Aclaracion:</textarea> -->
+            <div class="window_error" id="error">
+                <h6>
+                    {{MENSAJE}}
+                </h6>
+            </div>
+
+            <div class="window_control">
+                <input id="btnPublicar" name="btnPublicar" class="btn" type="submit" value="Publicar">
+            </div>
+
+        </form>
+    </div>
+
+
+
+
+
+</body>
+
+</html>
+
+
+
+<script src="../JS/Camionero/registrarCamion.js"> </script>

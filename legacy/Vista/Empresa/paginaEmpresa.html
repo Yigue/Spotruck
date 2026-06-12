@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="icon" type="image/svg" href="../../img/icono/truck3.svg">
+    <link rel="stylesheet" href="../../css/Empresa/paginaEmpresa.css">
+    <link rel="stylesheet" href="../../css/Empresa/header.css">
+    <link rel="stylesheet" href="../../css/Empresa/toggleMenu.css">
+    <!-- Compiled and minified CSS -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+
+    <title>Spotruck</title>
+</head>
+
+<body class="row s12 m4 l2  ">
+    <div class="navigation ocultar" onclick="myFunction()">
+        <ul>
+            <li>
+                <a href="perfil.php">
+                    <span class="icon-user"><i class="fa-solid fa-circle-user"></i></span>
+                    <div class="conte-user">
+                        <span class="title-user">Hola {{Nombre}}</span>
+                        <span class="title-user"><b>Empresa</b></span>
+                    </div>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-location-dot"></i></span>
+                    <span class="title">Publicaciones Activas</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-truck-fast"></i></span>
+                    <span class="title">Trayectos</span>
+                </a>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-bell"></i></span>
+                    <span class="title">Notificaciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-gear"></i></span>
+                    <span class="title">Configuracion</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-file-invoice"></i></span>
+                    <span class="title">Instrucciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-address-card"></i></span>
+                    <span class="title">Acerca de</span>
+                </a>
+            </li>
+            <li>
+                <a href="?btnLogout" id="btnLogout" name="btnLogout">
+                    <span class="icon"><i class="fa-solid fa-right-from-bracket"></i></span>
+                    <span class="title">Cerrar sesion</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+
+    <div id="encabezado-unico" class="z-depth-2">
+        <div id="nav-section">
+
+        </div>
+        
+        <div id="nav-logo">
+            <img class="nav-logo--img" src="../../img/icono/truck3.svg"> 
+        </div>
+
+        <div id="nav-toggle">
+            <div class="nav-toggle-cont">
+                <div class="toggle" onclick="toggleMenu()"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- <div id="listadoPublicaciones">
+
+    </div>
+    <template id="tpl_publicacion">
+        <div class="publicacion" id="pPublicacion">
+            <div class="publicacion_title">
+                <span class="icon-user"><i class="fa-solid fa-circle-user"></i></span>
+                <div class="conte-user">
+                    <span class="title-user">{{Nombre}}</span>
+                </div>
+            </div>
+
+            <div class="publicacion_container">
+
+                <div class="publicacion_image">
+                    <img src="https://th.bing.com/th/id/OIP.mjhozYsO6Z6EZwj4EVqtKAHaEc?pid=ImgDet&rs=1" alt="" h>
+                </div>
+
+                <div class="publicacion_control">
+                    <div class="publicacion_descrip">
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </template> -->
+
+    <div id="listadoPublicaciones">
+
+    </div>
+    <template id="tpl_publicacion">
+        <div class="row">
+            <div class="col s12 m6">
+                <div class="card hoverable" id="pPublicacion">
+                    <div class="card-image">
+                        <img src="https://th.bing.com/th/id/OIP.mjhozYsO6Z6EZwj4EVqtKAHaEc?pid=ImgDet&rs=1" alt="" h>
+                        <span class="card-title">{{Nombre}}</span>
+                        <!-- <a class="btn-floating halfway-fab waves-effect waves-light lime accent-4"><i class="material-icons">add</i></a> -->
+                    </div>
+                    <div class="card-content">
+                        <!-- <p>I am a very simple card. I am good at containing small bits of information. I am convenient because I require little markup to use effectively.</p> -->
+                        <!-- <div class="publicacion_descrip">
+
+                        </div> -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>                
+
+    <div class="cont-mas">
+        <div id="botonesEmpresa">
+            <a href="publicaciones.php" class="btn-floating btn-large waves-effect waves-light lime accent-4"><i class="material-icons">add</i></a>
+            <!-- <form action="publicaciones.php" method="POST">
+                <input type="submit" class="btnEmp" id="btnPublicar" name="btnPublicar" value="+">
+            </form> -->
+        </div>
+    </div>
+
+    <footer class="page-footer cyan lighten-3">
+        <div class="container">
+            <div class="row">
+            <div class="col l6 s12">
+                <h5 class="white-text ">SpoTruck</h5>
+                <p class="grey-text text-lighten-4">Presentado por Guillermo Riedel, Ana Lucía Basaldúa y Martina Villanueva.</p>
+            </div>
+            <div class="col l4 offset-l2 s12">
+                <h5 class="white-text">Links</h5>
+                <ul>
+                <li><a class="grey-text text-lighten-3" href="#!">Privacidad</a></li>
+                <li><a class="grey-text text-lighten-3" href="#!">Accesibilidad</a></li>
+                <li><a class="grey-text text-lighten-3" href="#!">Términos</a></li>
+                </ul>
+            </div>
+            </div>
+        </div>
+        <div class="footer-copyright">
+            <div class="container">
+            © 2022 SpoTruck Technologies, Inc.
+            <a class="grey-text text-lighten-4 right" href="#!">Quiénes somos</a>
+            </div>
+        </div>
+    </footer>
+
+</body>
+
+</html>
+
+<script src="../../JS/Empresa/paginaEmpresa.js"></script>
+
+<!-- Compiled and minified JavaScript -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+<script type="text/javascript">
+    function toggleMenu() {
+        let navigation = document.querySelector('.navigation');
+        let toggle = document.querySelector('.toggle');
+        navigation.classList.toggle('active');
+        toggle.classList.toggle('active');
+
+        var x = document.getElementById("botonesEmpresa");
+        if (x.style.display == "none") {
+            x.style.display = "block";
+        } else {
+            x.style.display = "none";
+        }
+    }    
+
+    /*document.addEventListener('DOMContentLoaded', function() {
+        var elems = document.querySelectorAll('.fixed-action-btn');
+        var instances = M.FloatingActionButton.init(elems, screen);
+      });
+      
+      $(document).ready(function(){
+        $('.fixed-action-btn').floatingActionButton();
+      });*/
+
+</script>
+
+
+
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+    integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+    crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js"
+    integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+    crossorigin="anonymous"></script>
+<script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+<script src="https://kit.fontawesome.com/de9cdb50bb.js" crossorigin="anonymous"></script>
+<script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>

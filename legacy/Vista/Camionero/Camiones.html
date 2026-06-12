@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <title>Spotruck</title> -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
+        integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+        <link rel="icon" type="image/svg" href="../../img/icono/truck3.svg">
+    <link rel="stylesheet" href="../../css/Camionero/camion.css">
+    <link rel="stylesheet" href="../../css/toggleMenu.css">
+    <title>Spotruck</title>
+
+</head>
+<body>
+    <div class="navigation ocultar">
+        <!-- <div id="menu-close" class="nav-menu">
+                <img src="../img/system/cerrar.svg" width="40px">
+            </div> -->
+        <ul>
+            <li>
+                <a href="perfil.php">
+                    <span class="icon-user"><i class="fa-solid fa-circle-user"></i></span>
+                    <div class="conte-user">
+                        <span class="title-user">Hola {{Nombre}}</span>
+                        <span class="title-user"><b>Transportista</b></span>
+                    </div>
+                    <!-- <span class="title-user">Guillermo</span>
+                        <span class="title-user">-Tipo usuario</span> -->
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-location-dot"></i></span>
+                    <span class="title">Viajes Disponibles</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-truck-fast"></i></span>
+                    <span class="title">Mis Viajes</span>
+                </a>
+            </li>
+            <li>
+                <a href="Camionero/Camiones.php" id="btnMisCamiones">
+                    <span class="icon"><i class="fa-solid fa-truck"></i></span>
+                    <span class="title">Mis Camiones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-bell"></i></span>
+                    <span class="title">Notificaciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-gear"></i></span>
+                    <span class="title">Configuracion</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-file-invoice"></i></span>
+                    <span class="title">Instrucciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-address-card"></i></span>
+                    <span class="title">Acerca de</span>
+                </a>
+            </li>
+            <li>
+                <a href="?btnLogout" id="btnLogout" name="btnLogout">
+                    <span class="icon"><i class="fa-solid fa-right-from-bracket"></i></span>
+                    <span class="title">Cerrar sesion</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+    
+    
+    <header>
+    
+        <div id="nav-section">
+        </div>
+    
+        <div id="nav-logo">
+            <img class="nav-logo--img" src="../../img/icono/truck3.svg">
+    
+        </div>
+        
+        <div id="nav-toggle">
+            <div class="nav-toggle-cont">
+                <div class="toggle" onclick="toggleMenu()"></div>
+            </div>
+        </div>
+    </header>
+
+    <nav>
+
+    </nav>
+
+    <content>
+<center>
+    <div id="map"></div>
+
+        <h2>Mis Camiones</h2>
+            <form action="" method="POST">
+                <input type="submit" class="btn" id="btnAgregar" name="btnAgregar" value="Agregar Camion">
+             </form>
+           
+        <div id="listadoCamiones">
+    <div class="window_error" id="error"> </div>
+
+        </div>
+        <template id="tpl_camion">
+            <div class="camion">
+                <div class="camion_title">
+
+                </div>
+
+                <div class="camion_container">
+
+                    <div class="camion_image">
+                        <img src="https://th.bing.com/th/id/R.cd0c1ba28c946db75cd7f1194062aa91?rik=cNkxcDNWFlo40g&riu=http%3a%2f%2fimagenes.4ever.eu%2fdata%2fdownload%2fcoches-motos%2fcamiones%2fcamion%2c-mercedes-benz%2c-carretera-por-la-noche%2c-acelerar%2c-coche-176183.jpg&ehk=S5BriT1oYRfURCkA4KiMdpZ%2bf1kJM07UkbUOZb82mqE%3d&risl=&pid=ImgRaw&r=0" alt="" >
+                    </div>
+
+                    <div class="camion_control">
+                        <div class="camionDes">
+
+                        </div>
+                        <button type="button" id="btnModal" class="btn btn-primary" data-toggle="modal" data-target="#vModal">
+                            Ver detalles
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- Modal Structure -->
+                <div class="modal fade" id="vModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle"
+                    aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="exampleModalLongTitle"></h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close"> <span
+                                        aria-hidden="true">&times;</span></button>
+                            </div>
+                            <div class="modal-body">
+                
+                            </div>
+                            <div class="modal-footer">
+                
+                                <button type="button" class="btn btn-secondary" id="btnBorrar" value="aa" onclick="">Borrar</button>
+                                <button type="button" class="btn btn-primary">Modificar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+    </content>
+    </div>
+</body>
+
+</html>
+<script src="../../JS/Camionero/Camiones.js"></script>
+<script type="text/javascript">
+        function toggleMenu() {
+            let navigation = document.querySelector('.navigation');
+            let toggle = document.querySelector('.toggle');
+            navigation.classList.toggle('active');
+            toggle.classList.toggle('active');
+        }
+    </script>
+  
+<script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+<script src="https://kit.fontawesome.com/de9cdb50bb.js" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>

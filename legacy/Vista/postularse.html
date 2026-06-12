@@ -1,0 +1,83 @@
+
+<body>
+    <div class="menu ocultar">
+        <div id="menu-close" class="nav-menu">
+            <img src="../img/system/cerrar.svg" width="40px">
+        </div>
+        <h1>MENU</h1>
+        <div class="menu-separador"></div>
+        <a href="" class="btn">Perfil</a>
+        <a href="" class="btn">Ayuda</a>
+        <a href="" class="btn">Cerrar sesión</a>
+
+    </div>
+
+    <header>
+        <div id="nav-logo">
+
+        </div>
+
+        <div id="nav-section">
+            <h1>Spotruck</h1>
+        </div>
+
+        <div id="nav-menu">
+            <img src="../img/system/menu.svg" width="20px">
+        </div>
+    </header>
+
+    <nav>
+
+    </nav>
+
+    <content>
+
+        <h2>Postulacion</h2>
+        
+        <div class="window">
+            <div class="window_title">
+                Postularse a NOMBREX
+            </div>
+            <!--             Ejemplo De publicacion    -->
+            <div class="window_container">
+
+                <div class="window_image">
+                    <img src="https://th.bing.com/th/id/OIP.mjhozYsO6Z6EZwj4EVqtKAHaEc?pid=ImgDet&rs=1" alt="" h>
+                </div>
+
+                <div class="window_control">
+
+                    <h2>Cargamento:</h2>
+                    <h2>Ubicacion:</h2>
+                    <h2>Tipos:</h2>
+                    <h2>Destino</h2>
+                    <h2>Fecha</h2>
+
+                    <!-- Deberia ser un form que mande la infpo(creo) -->
+                    <button id="ver" class="btn">Postularse</button>
+                </div>
+
+            </div>
+        </div>
+    </content>
+    <!-- Buscar forma para que las funciones de js esten en otro archivo -->
+    <script type="text/javascript">
+
+
+
+        document.addEventListener("DOMContentLoaded", () => {
+
+            document.querySelector("#nav-menu").addEventListener("click", event => {
+
+                document.querySelector(".menu").classList.add("mostrar")
+                document.querySelector(".menu").classList.remove("ocultar")
+            })
+
+            document.querySelector("#menu-close").addEventListener("click", event => {
+
+                document.querySelector(".menu").classList.add("ocultar")
+                document.querySelector(".menu").classList.remove("mostrar")
+
+            })
+        })
+    </script>

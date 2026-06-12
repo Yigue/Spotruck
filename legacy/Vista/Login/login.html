@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotruck</title>
+    <link rel="stylesheet" href="../css/login.css">
+    <link rel="icon" type="image/svg" href="../img/icono/truck3.svg">
+     <!-- Compiled and minified CSS -->
+     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+</head>
+
+<body>
+    <header>
+        <div class="header-img">
+            <!-- <img src="../img/icono/spotruck.svg"> -->
+        </div>
+
+    </header>
+
+    <content>
+      <div class="card-panel">
+        <div class="window">
+            <div class="window_title">
+                <!-- Iniciar Sesion -->
+            </div>
+            <div class="window_container">
+
+                <form action="login.php" method="POST">
+                    <label class="lbl" for="txtEmail">Email:</label>
+                    <input class="txt browser-default" type="text" id="txtEmail" name="txtEmail" required>
+
+                    <label class="lbl" for="txtContraseña">Contraseña:</label>
+                    <input class="txt browser-default" type="password" id="txtContraseña" name="txtContraseña" required>
+                    <!-- ERROR PARA CUANDO TENGAMOS BASE DE DATOS  -->
+                    <div class="window_error">
+                        <h6>
+                            {{MENSAJE}}
+                        </h6>
+                    </div>
+
+
+                    <div class="window_control"><input type="submit" class="btn light-blue lighten-3" id="btnLogin" name="btnLogin" value="Login"></div>
+
+                    <div class="window_options">
+                        ¿No tienes cuenta? <a href="register.php" class="lnk">Regístrate.</a>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+      </div>
+    </content>
+
+    <div id="relleno">
+    </div>
+
+
+    <!-- <footer>
+        <div id="footer">
+            <div class="footer-etiquetas"></div>
+            <div class="footer-navegacion"></div>
+            <div class="footer-terminos">
+                <a href="#">Privacidad</a>
+                <a href="#">Accesibilidad</a>
+                <a href="#">Términos</a>
+            </div>
+        </div>
+    </footer> -->
+
+    <footer class="page-footer cyan lighten-3">
+        <div class="container">
+          <div class="row">
+            <div class="col l6 s12">
+              <h5 class="white-text ">SpoTruck</h5>
+              <p class="grey-text text-lighten-4">Presentado por Guillermo Riedel, Ana Lucía Basaldúa y Martina Villanueva.</p>
+            </div>
+            <div class="col l4 offset-l2 s12">
+              <h5 class="white-text">Links</h5>
+              <ul>
+                <li><a class="grey-text text-lighten-3" href="#!">Privacidad</a></li>
+                <li><a class="grey-text text-lighten-3" href="#!">Accesibilidad</a></li>
+                <li><a class="grey-text text-lighten-3" href="#!">Términos</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="footer-copyright">
+          <div class="container">
+            © 2022 SpoTruck Technologies, Inc.
+          <a class="grey-text text-lighten-4 right" href="#!">Quiénes somos</a>
+          </div>
+        </div>
+      </footer>
+
+
+
+       <!-- Compiled and minified JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script type="text/JavaScript">
+      $(document).ready(function() {
+        M.updateTextFields();
+      });
+    </script>
+</body>
+</html>

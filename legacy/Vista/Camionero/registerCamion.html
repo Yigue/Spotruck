@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <title>Spotruck</title> -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
+            integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+            <link rel="icon" type="image/svg" href="../img/icono/truck3.svg">
+    <link rel="stylesheet" href="../css/Camionero/camion.css">
+    <link rel="stylesheet" href="../css/toggleMenu.css">
+    <title>Spotruck</title>
+</head>
+
+<body>
+    <div class="navigation ocultar">
+        <ul>
+            <li>
+                <a href="perfil.php">
+                    <span class="icon-user"><i class="fa-solid fa-circle-user"></i></span>
+                    <div class="conte-user">
+                        <span class="title-user">Hola {{Nombre}}</span>
+                        <span class="title-user"><b>Transportista</b></span>
+                    </div>
+                    <!-- <span class="title-user">Guillermo</span>
+                        <span class="title-user">-Tipo usuario</span> -->
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-location-dot"></i></span>
+                    <span class="title">Viajes Disponibles</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-truck-fast"></i></span>
+                    <span class="title">Mis Viajes</span>
+                </a>
+            </li>
+            <li>
+                <a href="Camionero/Camiones.php" id="btnMisCamiones">
+                    <span class="icon"><i class="fa-solid fa-truck"></i></span>
+                    <span class="title">Mis Camiones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-bell"></i></span>
+                    <span class="title">Notificaciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-gear"></i></span>
+                    <span class="title">Configuracion</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-file-invoice"></i></span>
+                    <span class="title">Instrucciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-address-card"></i></span>
+                    <span class="title">Acerca de</span>
+                </a>
+            </li>
+            <li>
+                <a href="?btnLogout" id="btnLogout" name="btnLogout">
+                    <span class="icon"><i class="fa-solid fa-right-from-bracket"></i></span>
+                    <span class="title">Cerrar sesion</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+    
+    
+    <header>
+    
+        <div id="nav-toggle">
+            <div class="nav-toggle-cont">
+                <div class="toggle" onclick="toggleMenu()"></div>
+            </div>
+        </div>
+    
+        <div id="nav-logo">
+            <img class="nav-logo--img" src="../img/icono/truck3.svg">
+    
+        </div>
+        <div id="nav-section">
+        </div>
+    </header>
+
+    <nav>
+
+    </nav>
+
+    <content>
+
+        <h1>Registrar Camion</h1>
+        <div class="window_container">
+            <form id="formularioPublicacion">
+
+                <label class="lbl" for="tipoDeCamion" id="tipoDeCamion">Tipo de Camion:</label>
+                <select class="txt" name="opTipoDeCamion" id="opTipoDeCamion">
+                    <!--  -->
+                </select>
+
+                <label class="lbl" for="capacidad">Capacidad Del Camion:</label>
+                <input class="txt" type="number" id="capacidad" name="capacidad"
+                    placeholder="Cantidad en KG ej:1000">
+
+                <label class="lbl" for="Ruta">Ruta:</label>
+                <input class="txt" type="text" id="ruta" name="ruta"
+                    placeholder="Ruta ej: N°412133">
+
+                <label class="lbl" for="Patente">Patente:</label>
+                <input class="txt" type="text" id="patente" name="patente"
+                    placeholder="Patente Ej:AD 234 BJ">
+
+                <!-- <textarea name="command" style="width: 382px; height: 247px;">Aclaracion:</textarea> -->
+                <div class="window_error" id="error">
+                    <h6>
+                     
+                    </h6>
+                </div>
+
+                <div class="window_control">
+                    <input id="btnPublicar" name="btnPublicar" class="btn" type="submit" value="Publicar">
+                </div>
+
+            </form>
+        </div>
+
+
+
+    </content>
+
+</body>
+
+</html>
+
+
+
+<script src="../JS/Camionero/registrarCamion.js"></script>
+<script type="text/javascript">
+    function toggleMenu() {
+        let navigation = document.querySelector('.navigation');
+        let toggle = document.querySelector('.toggle');
+        navigation.classList.toggle('active');
+        toggle.classList.toggle('active');
+    }
+</script>
+<script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+<script src="https://kit.fontawesome.com/de9cdb50bb.js" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+    integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+    crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js"
+    integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+    crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js"
+    integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
+    crossorigin="anonymous"></script>

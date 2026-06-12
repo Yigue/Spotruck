@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg" href="../../img/icono/truck3.svg">
+    <link rel="stylesheet" href="../../css/Camionero/paginaCamionero.css">
+    <link rel="stylesheet" href="../../css/Camionero/header.css">
+    <link rel="stylesheet" href="../../css/Camionero/toggleMenu.css">
+    <link rel="stylesheet" href="../../css/Camionero/body.css">
+    <link rel="stylesheet" href="../../css/Camionero/tabla.css">  
+    
+    <title>Spotruck</title>
+</head>
+
+<body>
+    <div class="navigation ocultar">
+        <ul>
+            <li>
+                <a href="perfil.php">
+                    <span class="icon-user"><i class="fa-solid fa-circle-user"></i></span>
+                    <div class="conte-user">
+                        <span class="title-user">Hola {{Nombre}}</span>
+                        <span class="title-user"><b>Transportista</b></span>
+                    </div>
+                </a>
+            </li>
+            <li>
+                <a href="../camionero.php">
+                    <span class="icon"><i class="fa-solid fa-location-dot"></i></span>
+                    <span class="title">Viajes Disponibles</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-truck-fast"></i></span>
+                    <span class="title">Mis Viajes</span>
+                </a>
+            </li>
+            <li>
+                <a href="Camionero/Camiones.php" id="btnMisCamiones">
+                    <span class="icon"><i class="fa-solid fa-truck"></i></span>
+                    <span class="title">Mis Camiones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-bell"></i></span>
+                    <span class="title">Notificaciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-gear"></i></span>
+                    <span class="title">Configuracion</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-file-invoice"></i></span>
+                    <span class="title">Instrucciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-address-card"></i></span>
+                    <span class="title">Acerca de</span>
+                </a>
+            </li>
+            <li>
+                <a href="?btnLogout" id="btnLogout" name="btnLogout">
+                    <span class="icon"><i class="fa-solid fa-right-from-bracket"></i></span>
+                    <span class="title">Cerrar sesion</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <header>
+        <div id="nav-section">
+        </div>
+        
+
+        <div id="nav-logo">
+            <img class="nav-logo--img" src="../../img/icono/truck3.svg">
+
+        </div>
+        
+        <div id="nav-toggle">
+            <div class="nav-toggle-cont">
+                <div class="toggle" onclick="toggleMenu()"></div>
+            </div>
+        </div>
+    </header>
+
+<content>
+    <div class="window_container">
+        <form id="formulariiOferta">
+            <label class="lbl" for="idCamion" >Camion a Elegir</label>
+            <select class="txt" id="idCamion" name="idCamion">
+
+            </select>
+            
+            <label class="lbl" for="precio">Precio:</label>
+            <input class="txt" type="number" id="precio" name="precio">
+
+            <label class="lbl" for="precio">Aclaracion:</label>
+            <input class="txt" type="txt" id="aclaracion" name="aclaracion">
+
+            
+
+    
+            <div class="window_error" id="error">
+  
+            </div>
+
+            <div class="window_control">
+                <input id="btnPostularse" name="btnPostularse" class="btn" type="submit" value="Realizar Oferta">
+            </div>
+
+        </form>
+    </div>
+</content>
+
+
+
+    <div id="tabla">
+        <div class="titulo">
+            <p>Subastas</p>
+        </div>
+        <table class="table">  
+            <thead>
+                <th>Postulante</th>
+                <th>Precio</th>
+                <th>Fecha</th>
+            </thead>
+            <tbody>
+                <tr>
+                    <td data-label="Postulante">{{POSTULANTE}}</td>
+                    <td data-label="Precio">{{PRECIO}}</td>
+                    <td data-label="Fecha">{{FECHA}}</td>
+                </tr>
+                <!-- <tr>
+                    <td data-label="Postulante">post1</td>
+                    <td data-label="Precio">1000</td>
+                    <td data-label="Fecha">11/02/22</td>
+                </tr>
+                <tr>
+                    <td data-label="postulante">post1</td>
+                    <td data-label="precio">1000</td>
+                    <td data-label="fecha">11/02/22</td>
+                </tr>
+                <tr>
+                    <td data-label="postulante">post1</td>
+                    <td data-label="precio">1000</td>
+                    <td data-label="fecha">11/02/22</td>
+                </tr> --> 
+            </tbody>
+        </table>
+    </div>
+
+
+                
+</body>
+
+</html>
+<script src="../../JS/Camionero/postularse.js"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+    integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+    crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js"
+    integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+    crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js"
+    integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
+    crossorigin="anonymous"></script>
+<script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+<script src="https://kit.fontawesome.com/de9cdb50bb.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-A3rJD856KowSb7dwlZdYEkO39Gagi7vIsF0jrRAoQmDKKtQBHUuLZ9AsSv4jD4Xa"
+    crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.5/dist/umd/popper.min.js"
+    integrity="sha384-Xe+8cL9oJa6tN/veChSP7q+mnSPaj5Bcu9mPX5F5xIGE0DVittaqT5lorf0EI7Vk"
+    crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.min.js"
+    integrity="sha384-ODmDIVzN+pFdexxHEHFBQH3/9/vQ9uori45z4JjnFsRydbmQbmL5t1tQ0culUzyK"
+    crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css"
+    integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ=="
+    crossorigin="" />
+
+<script type="text/javascript">
+    function toggleMenu() {
+        let navigation = document.querySelector('.navigation');
+        let toggle = document.querySelector('.toggle');
+        navigation.classList.toggle('active');
+        toggle.classList.toggle('active');
+    }
+</script>

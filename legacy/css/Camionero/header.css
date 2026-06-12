@@ -1,0 +1,98 @@
+:root {
+	--color-primary: #B5E521;
+	--color-secondary: #9AD7E7;
+	--color-web: #F8F6F0;
+    --color-dark: #0F0E0C;
+    --color-light: #FBFBFB;
+}
+
+* {
+	margin: 0rem;
+	padding: 0rem;
+	box-sizing: border-box;
+	font-family: sans-serif;
+}
+
+body {
+	
+	background-attachment: fixed;
+	background-size: cover;
+}
+
+#encabezado-unico{
+	height: 10vh;
+	width: 100%;
+	background-color: var(--color-secondary);
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+
+}
+#nav-section{
+	height: 100%;
+	width: 30%;
+	display: flex;
+}
+
+#nav-logo {
+	height: 100%;
+    width: 30%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    flex-direction: row;
+}
+
+.nav-logo--img {
+	height: 100%;
+}
+
+#nav-toggle{
+	height: 100%;
+	width: 30%;
+	display: flex;
+	align-items: center;
+	justify-content: right;
+
+	
+}
+#leafletMap{
+	width: 100%;
+	height: 100%;
+}
+.nav-toggle-cont{
+	height: 100%;
+	width: 50%;
+	font-weight: bold;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+
+/*              CSS MENU          */
+nav {
+	text-align: right;
+	padding: .5rem 1rem;
+}
+
+
+@media only screen and (max-width: 767px) {
+	header {
+		height: 60px;
+		/* flex-direction: row-reverse; */
+	}
+	#nav-toggle{
+		height: 100%;
+		justify-content: right;
+	}
+	.nav-toggle-cont{
+		display: flex;
+		justify-content: right;
+	}
+}
+
+/* @media only screen and (min-width: 576px) and (max-width: 768px){
+	
+} */

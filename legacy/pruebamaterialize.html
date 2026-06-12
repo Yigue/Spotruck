@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/materialize.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <title>Document</title>
+    <style>
+        .pd10 {
+            padding: 20px !important
+        }
+        .mg10 {margin: none;}
+        @media screen and (orientation=portrait){
+            .mg10 {margin: 10px;}
+        }
+    </style>
+
+
+</head>
+
+<body>
+
+    <div class="container center-align">
+        <div class="row">
+            <div class="col m3 s12 center">
+                <img class="circle responsive-img" src="img/price.jfif" height="80px">
+                <div class="row col m10 offset-m1 s12">
+                    <h5>Capitán Price</h5>
+                    <div class="divider"></div>
+                    <h6>Lorem ipsum dolor sit amet consectetur adipisicing elit.</h6>
+                </div>
+            </div>
+            <!----------------------------------------------------------->
+            <div class="col m9 s12 indigo white-text">
+                <div class="row col m10 offset-m1 s12">
+                    <h3>Capitán Price</h3>
+                    <h5>Lorem ipsum dolor sit amet consectetur adipisicing elit.</h5>
+                </div>
+                <div class="row col m10 offset-m1 s12 white  pd10">
+                    <form class="col m12">
+                        <div class="row">
+                            <div class="input-field col m6 s12">
+                                <input id="first_name" type="text" class="validate">
+                                <label for="first_name">Nombre</label>
+                            </div>
+                            <div class="input-field col m6 s12">
+                                <input id="last_name" type="text" class="validate">
+                                <label for="last_name">Apellido</label>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="input-field col m6 s12">
+                                <input id="correo" type="email" class="validate">
+                                <label for="correo">Correo-electrónico</label>
+                            </div>
+                            <div class="input-field col m6 s12">
+                                <input id="telefono" type="number" class="validate" maxlength="10">
+                                <label for="telefono">Teléfono</label>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="input-field col m5 s12">
+                                <input id="address" type="text" class="validate">
+                                <label for="address">Dirección</label>
+                            </div>
+                            <div class="input-field col m5 s6">
+                                <input id="city" type="text" class="validate" autoComplete="home city">
+                                <label for="city">Ciudad</label>
+                            </div>
+                            <div class="input-field col m2 s6">
+                                <input id="cod_postal" type="number" class="validate" pattern="/^-?\d+\.?\d*$/ onKeyPress="if(this.value.length==4) return false;" />
+                               
+                                <label for="cod_postal">C.P.</label>
+                            </div>
+                            
+                        </div>
+
+                      
+                        <div class="col m12 s12">
+                            <button class="mg10 col m5 s12 btn indigo white-text waves-light" type="submit" name="action">Guardar
+                                <i class="material-icons right">save</i>
+                            </button>
+                                      <button class="col m5 offset-m2 s12 btn indigo lighten-4 white-text waves-light mg10" type="submit"
+                                name="action">Cancelar
+                                <i class="material-icons right">cancel</i>
+                            </button>
+                        </div>
+
+
+                    </form>
+
+                </div>
+
+
+ 
+
+
+
+            </div>
+
+
+
+        </div>
+
+
+
+
+
+
+    </div>
+
+
+
+
+    <script src="js/materialize.js"></script>
+
+</body>
+
+</html>

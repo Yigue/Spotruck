@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <link rel="icon" type="image/svg" href="../../img/icono/truck3.svg">
+    <link rel="stylesheet" href="../../css/Camionero/header.css">
+    <link rel="stylesheet" href="../../css/Camionero/paginaCamionero.css">
+    <link rel="stylesheet" href="../../css/Camionero/toggleMenu.css">
+    <link rel="stylesheet" href="../../css/Camionero/tabla.css">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
+
+    <title>Spotruck</title>
+</head>
+
+<body>
+    <div class="navigation ocultar">
+        <ul>
+            <li>
+                <a href="perfil.php">
+                    <span class="icon-user"><i class="fa-solid fa-circle-user"></i></span>
+                    <div class="conte-user">
+                        <span class="title-user">Hola {{Nombre}}</span>
+                        <span class="title-user"><b>Transportista</b></span>
+                    </div>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-location-dot"></i></span>
+                    <span class="title">Viajes Disponibles</span>
+                </a>
+            </li>
+                        <li>
+                            <a href="Camiones.php" id="btnMisCamiones">
+                                <span class="icon"><i class="fa-solid fa-truck"></i></span>
+                                <span class="title">Mis Camiones</span>
+                            </a>
+                        </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-truck-fast"></i></span>
+                    <span class="title">Mis Viajes</span>
+                </a>
+            </li>
+             <li>
+                <a href="misPostulaciones.php">
+                    <span class="icon"><i class="fa-solid fa-file-invoice"></i></span>
+                    <span class="title">Mis Postulaciones</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-bell"></i></span>
+                    <span class="title">Notificaciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-gear"></i></span>
+                    <span class="title">Configuracion</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-file-invoice"></i></span>
+                    <span class="title">Instrucciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-address-card"></i></span>
+                    <span class="title">Acerca de</span>
+                </a>
+            </li>
+            <li>
+                <a href="?btnLogout" id="btnLogout" name="btnLogout">
+                    <span class="icon"><i class="fa-solid fa-right-from-bracket"></i></span>
+                    <span class="title">Cerrar sesion</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+
+    <div id="encabezado-unico" class="z-depth-2">
+        <div id="nav-section">
+        </div>
+        
+        <div id="nav-logo">
+            <img class="nav-logo--img" src="../../img/icono/truck3.svg"> 
+        </div>
+
+        <div id="nav-toggle">
+            <div class="nav-toggle-cont">
+                <div class="toggle" onclick="toggleMenu()"></div>
+            </div>
+        </div>
+    </div>
+
+
+
+    
+
+        <!-- <h1>Publicaciones camioneros</h1> -->
+            <!-- <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1490.1951984635648!2d-0.8897282384751197!3d41.6689113893635!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xd5914a2dbaef783%3A0xcefbedb5510a16d!2sUup!5e0!3m2!1ses!2ses!4v1535631076018" width="90%" height="400vh" frameborder="0" style="border:0" allowfullscreen></iframe> -->
+        <div id="map"></div>
+            <div id="listadoPublicaciones"> </div>
+             <template id="tpl_publicacion">
+                <div class="publicacion">
+                    <div class="publicacion_title">
+
+                    </div>
+
+                    <div class="publicacion_container">
+
+                        <div class="publicacion_image">
+                            <img src="https://th.bing.com/th/id/OIP.mjhozYsO6Z6EZwj4EVqtKAHaEc?pid=ImgDet&rs=1" alt="" h>
+                         </div>
+
+                        <div class="publicacion_control">
+                             <div class="publicacion_descrip"></div>
+                            <button type="button" id="btnModal" class="btn btn-primary" data-toggle="modal" data-target="#vModal">Ver detalles</button>
+                        </div>
+
+                    </div>
+
+                        <div class="modal fade" id="vModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle"
+                                        aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered" role="document">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="exampleModalLongTitle"></h5>
+                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                        <span aria-hidden="true">&times;</span>
+                                                    </button>
+                                                </div>
+                                                <div class="modal-body">
+
+                                                </div>
+                                                    <div class="modal-footer">
+                                                    
+                                                        <button type="button" class="btn btn-secondary" id="btnPostularse" data-dismiss="modal">Postularse</button>
+                                                    </div>
+                                            </div>
+                                        </div>
+                         </div>
+                    </div>
+            </template>
+       
+    </div>
+
+    
+
+
+
+
+    
+    </body>
+</html>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDZ4aBC1aO_OyfoGH5e5nLnrQ0yaHc0XtY&callback=initMap"></script>
+<script src="../../JS/Camionero/paginaCamionero.js"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js"  integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+<script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+<script src="https://kit.fontawesome.com/de9cdb50bb.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-A3rJD856KowSb7dwlZdYEkO39Gagi7vIsF0jrRAoQmDKKtQBHUuLZ9AsSv4jD4Xa" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.5/dist/umd/popper.min.js" integrity="sha384-Xe+8cL9oJa6tN/veChSP7q+mnSPaj5Bcu9mPX5F5xIGE0DVittaqT5lorf0EI7Vk"  crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.min.js" integrity="sha384-ODmDIVzN+pFdexxHEHFBQH3/9/vQ9uori45z4JjnFsRydbmQbmL5t1tQ0culUzyK"   crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css" integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ==" crossorigin="" />
+
+<script type="text/javascript">
+                function toggleMenu() {
+                let navigation = document.querySelector('.navigation');
+                let toggle = document.querySelector('.toggle');
+                navigation.classList.toggle('active');
+                toggle.classList.toggle('active');
+            }
+</script>

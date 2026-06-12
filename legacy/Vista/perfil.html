@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <title>Spotruck</title> -->
+    <link rel="stylesheet" href="../css/estilos.css">
+    <title>Spotruck</title>
+</head>
+    <body>
+    <div class="menu ocultar">
+        <div id="menu-close" class="nav-menu">
+            <img src="../img/system/cerrar.svg" width="40px">
+        </div>
+        <h1>MENU</h1>
+
+        <div class="menu-separador"></div>
+        <form action="../Control/Perfil_Control.php" method="POST">
+            <input type="submit" class="btn" id="btnInicio" name="btnInicio" value="Inicio">
+            <p></p>
+            <a href="" class="btn">Ayuda</a>
+            <p></p>
+            <input type="submit" class="btn" id="btnLogout" name="btnLogout" value="Cerrar Sesion">
+        </form>
+
+
+    </div>
+
+    <header>
+        <div id="nav-logo">
+
+        </div>
+
+        <div id="nav-section">
+            <h1>Spotruck</h1>
+        </div>
+
+        <div id="nav-menu">
+            <img src="../img/system/menu.svg" width="20px">
+        </div>
+    </header>
+    <content>
+        <!-- Perfil -->
+        <Section>
+            <br>
+            <br>
+            <div id="window">
+
+                <div class="window_title">
+                    Perfil
+                </div>
+
+                <div class="window_container">
+                    <div class="window_image_perfil">
+                        <p> <img src="../img/avatar/no-avatar.png" width="150px"></p><br>
+                    </div>
+
+                    <div class="window_control">
+                        <form action="Perfil_Control.php" method="POST">
+                             <p>
+                                <label class="lbl" for="txtemail">Correo Eletronico:</label>
+                                <input class="txt" type="email" id="txtemail" name="txtemail" required>
+                            </p>
+
+                            <label class="lbl" for="txtCUIT">CUIT:</label>
+                            <input class="txt" type="text" id="txtCUIT" name="txtCUIT" required>
+
+                            <label class="lbl" for="txtNombre">Nombre:</label>
+                            <input class="txt" type="text" id="txtNombre" name="txtNombre" required>
+
+                            <label class="lbl" for="txtTel">Telefono:</label>
+                            <input class="txt" type="text" id="txtTel" name="txtTel" required>
+
+                            <label class="lbl" for="txtContraseña">Contraseña:</label>
+                            <input class="txt" type="password" id="txtContraseña" name="txtContraseña" required>
+
+
+
+                            <div class="window_error">
+                                <h6>
+                                    {{MENSAJE}}
+                                    <!-- <?php
+
+                                    echo $msg;
+
+                                    ?> -->
+                                </h6>
+                            </div> 
+
+                            <div class="window_control">
+                                <input id="btnModificar" name="btnModificar" class="btn" type="submit" value="Modificar"></input>
+                                <input id="btnEliminar" name="btnEliminar" class="btn" type="submit" value="Eliminar"></input>
+                            </div>
+
+                        </form>
+
+
+                    </div>
+
+
+
+
+                </div>
+
+        </Section>
+    </content>
+</body>
+</html>
+
+
+    <script type="text/javascript">
+        document.addEventListener("DOMContentLoaded", () => {
+
+            document.querySelector("#nav-menu").addEventListener("click", event => {
+
+                document.querySelector(".menu").classList.add("mostrar")
+                document.querySelector(".menu").classList.remove("ocultar")
+            })
+
+            document.querySelector("#menu-close").addEventListener("click", event => {
+
+                document.querySelector(".menu").classList.add("ocultar")
+                document.querySelector(".menu").classList.remove("mostrar")
+
+            })
+        })
+    </script>

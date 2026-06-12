@@ -1,0 +1,70 @@
+content h1{
+	color: black;
+}
+content {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+
+}
+
+content inframe{
+	background-color: black;
+    border-radius: 8px;
+    box-shadow: 0px 0px 4px 0px;
+    overflow: hidden;
+    margin: 1rem;
+} 
+
+/*---------------------------------CSS WINDOWSSSS---------------------------------------*/
+.window {
+	border-radius: 8px;
+	box-shadow: 0px 0px 4px 0px;
+	overflow: hidden;
+	margin: 1rem;
+	color: var(--color-dark);
+	display: flex;
+	flex-direction: column;
+
+}
+.window_title {
+	padding: .5rem 1rem .5rem 1rem;
+	background-color: var(--color-secondary); 
+	color: var(--color-dark);
+	font-weight: bold;
+}
+.window_container {
+	display: flex;
+	flex-direction: row;
+	padding: 1rem;
+	background-color: var(--color-web);
+}
+.window_image{
+	flex: 1.5;
+
+}
+.window_image_perfil{
+	flex: 1.5;
+	border-radius:150px;
+
+}
+.window_image img {
+max-width: 100%;
+max-height: 100%;
+}
+
+
+.window_error{
+	color: red;
+}
+
+.window_control {
+	flex: 2;
+	text-align: center;
+	padding: 1rem 0rem;
+}
+
+.window_options{
+	text-align: center;
+}

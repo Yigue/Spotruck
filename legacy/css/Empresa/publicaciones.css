@@ -1,0 +1,16 @@
+:root{
+	--color-primary: #B5E521;
+	--color-secondary: #9AD7E7;
+	--color-web: #F8F6F0;
+    --color-dark: #0F0E0C;
+    --color-light: #FBFBFB;
+}
+
+*{
+	margin: 0rem;
+	padding: 0rem;
+	box-sizing: border-box;
+	font-family: sans-serif;
+}
+
+

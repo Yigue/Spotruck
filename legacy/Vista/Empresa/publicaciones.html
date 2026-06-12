@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <title>Spotruck</title> -->
+    <link rel="stylesheet" href="../../css/Empresa/paginaEmpresa.css">
+    <link rel="stylesheet" href="../../css/Empresa/header.css">
+    <link rel="stylesheet" href="../../css/Empresa/toggleMenu.css">
+    <link rel="stylesheet" href="../../css/Empresa/body.css">
+    <title>Spotruck</title>
+</head>
+<body>
+    <div class="navigation ocultar">
+        <ul>
+            <li>
+                <a href="perfil.php">
+                    <span class="icon-user"><i class="fa-solid fa-circle-user"></i></span>
+                    <div class="conte-user">
+                        <span class="title-user">Hola {{Nombre}}</span>
+                        <span class="title-user"><b>Empresa</b></span>
+                    </div>
+                    <!-- <span class="title-user">Guillermo</span>
+                    <span class="title-user">-Tipo usuario</span> -->
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-location-dot"></i></span>
+                    <span class="title">Publicaciones Activas</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-truck-fast"></i></span>
+                    <span class="title">Trayectos</span>
+                </a>
+            </li>
+            <!-- <li>
+                <a href="Camionero/Camiones.php" id="btnMisCamiones">
+                    <span class="icon"><i class="fa-solid fa-truck"></i></span>
+                    <span class="title">Mis Camiones</span>
+                </a>
+            </li> -->
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-bell"></i></span>
+                    <span class="title">Notificaciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-gear"></i></span>
+                    <span class="title">Configuracion</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-file-invoice"></i></span>
+                    <span class="title">Instrucciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-address-card"></i></span>
+                    <span class="title">Acerca de</span>
+                </a>
+            </li>
+            <li>
+                <a href="?btnLogout" id="btnLogout" name="btnLogout">
+                    <span class="icon"><i class="fa-solid fa-right-from-bracket"></i></span>
+                    <span class="title">Cerrar sesion</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+
+    <header>
+        <div id="nav-section">
+            
+        </div>
+
+        <div id="nav-logo">
+            <img class="nav-logo--img" src="../../img/icono/truck3.svg">
+        </div>
+       
+        
+        <div id="nav-toggle">
+            <div class="nav-toggle-cont">
+                <div class="toggle"   onclick="toggleMenu()" ></div>
+            </div>
+        </div>
+    </header>
+
+
+    <nav>
+
+    </nav>
+
+    <content>
+        <div class="window_container">
+            <form  id="formularioPublicacion">
+                <label class="lbl" for="provinciaOrigen">Provincia Origen:</label>
+                <select class="txt" id="opProvinciasOrigen">
+                </select>
+                <label class="lbl" for="localidadesOrigenLB" id="localidadesOrigenLB">Localidad Origen:</label>
+                <select class="txt" name="opLocalidadesOrigen" id="opLocalidadesOrigen">
+                </select>
+
+                <label class="lbl" for="provinciaDestino">Provincia Destino:</label>
+                    <select class="txt" id="opProvinciasDestino">
+                    </select>
+                <label class="lbl" for="localidadDestinoLB" id="localidadDestinoLB">Localidad Destino:</label>
+                        <select class="txt" name="opLocalidadesDestino" id="opLocalidadesDestino">
+                        </select>
+
+                <label class="lbl" for="fechaInicio">Fecha Inicio:</label>
+                <input class="txt" type="date" id="fechaInicio" name="fechaInicio" >
+
+                <label class="lbl" for="fechaFin">Fecha Fin:</label>
+                <input class="txt" type="date" id="fechaFin" name="fechaFin" >
+
+                <label class="lbl" for="tipoDeCarga" id="tipoDeCargaLB">Tipo de Carga:</label>
+                    <select class="txt" name="opTipoDeCarga" id="opTipoDeCarga">
+                    </select>
+
+                <label class="lbl" for="pesoCargamento">Peso Cargamento:</label>
+                <input class="txt" type="number" id="pesoCargamento" name="pesoCargamento" placeholder="Cantidad en KG ej:1000" >
+
+                <label class="lbl" for="">Volumen Cargamento:</label>
+                <input class="txt" type="text" id="volumenCargamento" name="volumenCargamento" placeholder="Volumen de carga ej:10 Pallets" >
+
+                <label class="lbl" for="Descripcion">Descripcion:</label>
+                <input class="txt" type="text" id="detalles" name="detalles" placeholder="Descripcion a agregar Ej:Lo Necesito con Urgencia">
+
+                <!-- <textarea name="command" style="width: 382px; height: 247px;">Aclaracion:</textarea> -->
+                <div class="window_error" id="error">
+                    <h6>
+               
+                    </h6>
+                </div>
+
+                <div class="window_control"> 
+                    <input id="btnPublicar" name="btnPublicar" class="btn" type="submit" value="Publicar">
+                </div>
+
+            </form>
+        </div>
+</content>
+
+</body>
+</html>
+
+
+
+ <script src="../../JS/Empresa/publicaciones.js"> </script>
+ <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+<script src="https://kit.fontawesome.com/de9cdb50bb.js" crossorigin="anonymous"></script>
+
+<script type="text/javascript">
+    function toggleMenu() {
+        let navigation = document.querySelector('.navigation');
+        let toggle = document.querySelector('.toggle');
+        navigation.classList.toggle('active');
+        toggle.classList.toggle('active');
+
+        function myFunction() {
+            var x = document.getElementById(".navigation");
+            if (x.style.display === "none") {
+                x.style.display = "block";
+            } else {
+                x.style.display = "none";
+            }
+        }
+
+    }
+   
+</script>
+
+<!-- 'idEmpresa' = trim($idEmpresa),
+'fechaInicio' = trim($_POST['fechaInicio']),
+'fechaFin' = trim($_POST['fechaFin']),
+'1dLocalidad' = trim($_POST['idLocalidad']),
+'1dCargamento' = trim($_POST['idCargamento']),
+'pesoCargamento' = trim($_POST['pesoCargamento']),
+'volumenCargamento' = trim($_POST['volumenCargamento']),
+'origen' = trim($_POST['origen']),
+'destino' = trim($_POST['destino']),
+'aclaracion' = trim($_POST['aclaracion1']),
+ -->

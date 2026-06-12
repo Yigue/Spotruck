@@ -1,0 +1,131 @@
+*{
+    padding: 0%;
+    margin: 0%;
+    box-sizing: border-box;
+}
+
+:root{
+    --color-primary: #B5E521;
+	--color-secondary: #9AD7E7;
+	--color-web: #F8F6F0;
+    --color-dark: #0F0E0C;
+}
+
+body{
+    min-height: 100vh;
+    overflow-x: hidden;
+    background: var(--color-web);
+}
+
+.navigation{
+    position: fixed;
+    width: 60px;
+    height: 100%;
+    background: var(--color-secondary);
+    transition: 0.5s;
+    overflow: hidden;
+}
+
+
+.navigation:hover,
+.navigation.active{
+    width: 300px;
+}
+
+
+.navigation ul{
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+}
+
+
+.navigation ul li{
+    position: relative;
+    width: 100%;
+    list-style: none;
+}
+
+.navigation ul li:hover{
+    background: var(--color-web);
+}
+.navigation ul li a{
+    position: relative;
+    display: block;
+    width: 100%;
+    display: flex;
+    text-decoration: none;
+    color: var(--color-web);
+}
+
+.navigation ul li a:hover{
+    color: var(--color-primary);
+}
+
+.navigation ul li a .icon{
+    position: relative;
+    display: block;
+    min-width: 60px;
+    height: 60px;
+    line-height: 60px;
+    text-align: center;
+}
+
+.navigation ul li a .icon {
+    font-size: 25px;
+}
+
+.navigation ul li a .title{
+    position: relative;
+    display: block;
+    padding: 0 10px;
+    height: 60px;
+    line-height: 60px;
+    text-align: start;
+    white-space: nowrap;
+    font-size: 25px;
+}
+
+
+.toggle{
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 60px;
+    background-color: var(--color-secondary);
+}
+
+.toggle.active{
+    background-color: var(--color-web);
+}
+
+.toggle:before{
+    content: '\f0c9';
+    font-family: fontAwesome;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    line-height: 60px;
+    text-align: center;
+    font-size: 24px;
+    color: var(--color-web);
+}
+
+.toggle.active:before{
+    content: '\f00d';
+    font-family: fontAwesome;
+    color: var(--color-primary);
+}
+
+@media (max-width: 767px){
+    .navigation{
+        left: -60px;
+    }
+
+    .navigation.active{
+        left: 0px;
+        width: 100%;
+    }
+}

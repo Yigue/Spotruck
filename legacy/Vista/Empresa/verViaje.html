@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <link rel="icon" type="image/svg" href="../../img/icono/truck3.svg">
+    <link rel="stylesheet" href="../../css/Empresa/paginaEmpresa.css">
+    <link rel="stylesheet" href="../../css/Empresa/header.css">
+    <link rel="stylesheet" href="../../css/Empresa/toggleMenu.css">
+    <link rel="stylesheet" href="../../css/Camionero/tabla.css">
+
+    <title>Spotruck</title>
+</head>
+
+<body>
+    <div class="navigation ocultar" onclick="myFunction()">
+        <ul>
+            <li>
+                <a href="perfil.php">
+                    <span class="icon-user"><i class="fa-solid fa-circle-user"></i></span>
+                    <div class="conte-user">
+                        <span class="title-user">Hola {{Nombre}}</span>
+                        <span class="title-user"><b>Empresa</b></span>
+                    </div>
+
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-location-dot"></i></span>
+                    <span class="title">Publicaciones Activas</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-truck-fast"></i></span>
+                    <span class="title">Trayectos</span>
+                </a>
+            </li>
+            <!-- <li>
+                <a href="Camionero/Camiones.php" id="btnMisCamiones">
+                    <span class="icon"><i class="fa-solid fa-truck"></i></span>
+                    <span class="title">Mis Camiones</span>
+                </a>
+            </li> -->
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-bell"></i></span>
+                    <span class="title">Notificaciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-gear"></i></span>
+                    <span class="title">Configuracion</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-file-invoice"></i></span>
+                    <span class="title">Instrucciones</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <span class="icon"><i class="fa-solid fa-address-card"></i></span>
+                    <span class="title">Acerca de</span>
+                </a>
+            </li>
+            <li>
+                <a href="?btnLogout" id="btnLogout" name="btnLogout">
+                    <span class="icon"><i class="fa-solid fa-right-from-bracket"></i></span>
+                    <span class="title">Cerrar sesion</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+    <header>
+        <div id="nav-section">
+
+        </div>
+        <div id="nav-logo">
+            <img class="nav-logo--img" src="../../img/icono/truck3.svg">
+        </div>
+        <div id="nav-toggle">
+            <div class="nav-toggle-cont">
+                <div class="toggle" onclick="toggleMenu()"></div>
+            </div>
+        </div>
+    </header>
+    <content>
+        <div id="listadoPublicaciones"></div>
+        <template id="tpl_publicacion">
+            
+            <div class="publicacion">
+                <div class="publi_title"><h4> Datos publicacion  </h4></div>
+                <div class="descrip_publi"> </div>
+                <div class="camionero_title"><h4> Datos camionero  </h4></div>
+                <div class="descrip_camionero"> </div>
+                    <div class="camion_title">
+                        <h4> Datos camion </h4>
+                    </div>
+                    <div class="descrip_camion"> </div>
+            </div>
+        </template>
+
+      
+
+
+
+        </div>
+    </content>
+
+
+
+</body>
+
+</html>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script src="../../JS/Empresa/verViaje.js"></script>
+<script type="text/javascript">
+    function toggleMenu() {
+        let navigation = document.querySelector('.navigation');
+        let toggle = document.querySelector('.toggle');
+        navigation.classList.toggle('active');
+        toggle.classList.toggle('active');
+
+        var x = document.getElementById("botonesEmpresa");
+        if (x.style.display == "none") {
+            x.style.display = "block";
+        } else {
+            x.style.display = "none";
+        }
+    }
+</script>
+
+<script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+<script src="https://kit.fontawesome.com/de9cdb50bb.js" crossorigin="anonymous"></script>
+<script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>

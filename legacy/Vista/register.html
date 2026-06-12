@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/registro.css">
+     <!-- Compiled and minified CSS -->
+     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+     <!--Import Google Icon Font-->
+     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <title>Spotruck</title>
+</head>
+    <body>
+
+    <header>
+        <div class="header-img">
+        </div>
+    </header>
+
+    <content>
+        <div class="card-panel">
+            <div class="window" id="p1">
+                <div class="window_title">
+                </div>
+                <div class="window_container">
+                    <form action="register.php" method="POST">
+
+                        <label class="lbl" for="txtemail">Correo Eletronico:</label>
+                        <input class="txt browser-default" type="email" id="txtemail" name="txtemail" required>
+
+                        <label class="lbl" for="txtCUIT">CUIT:</label>
+                        <input class="txt browser-default" type="text" id="txtCUIT" name="txtCUIT"  maxlength="13" required>
+
+                        <label class="lbl" for="txtNombre">Nombre:</label>
+                        <input class="txt browser-default" type="text" id="txtNombre" name="txtNombre" required>
+
+                        <label class="lbl" for="txtTel">Telefono:</label>
+                        <input class="txt browser-default" type="number" id="txtTel" name="txtTel" required>
+
+                        <label class="lbl" for="txtContrasena">Contraseña:</label>
+                        <input class="txt browser-default" type="password" id="txtContrasena" name="txtContrasena" minlength="6" required>
+
+                        <label class="lbl" for="txtContrasenaRP">Repetir Contraseña:</label>
+                        <input class="txt browser-default" type="password" id="txtContrasenaRP" name="txtContrasenaRP" minlength="6" required>
+
+                        <label class="lbl" for="Tipodeusuario">Tipo de Usuario: </label>
+                        
+                        <!-- <input class="radio browser-defaul" type="radio" id="UsCam" name="TipUS" value="1"  required>
+
+                        <input class="radio browser-defaul" type="radio" id="UsEmp" name="TipUS" value="2"  required>
+                        <div class="lbl-tipo-div">
+                            <label class="lbl-tipo" for="Tipodeusuario">Empresa</label>
+                            <label class="lbl-tipo" for="Tipodeusuario">Transportista</label>
+                        </div> -->
+
+                        
+                        <p>
+                            <label>
+                            <input type="radio" id="UsEmp" name="TipUS" value="2" required />
+                            <span for="Tipodeusuario">Empresa</span>
+                            </label>
+                        </p>
+                        <p>
+                            <label>
+                            <input type="radio" id="UsEmp" name="TipUS" value="1" required/>
+                            <span for="Tipodeusuario">Transportista</span>
+                            </label>
+                        </p>
+                    
+                        
+
+                        <div class="window_error">
+                            <h6>
+                                {{MENSAJE}}
+                            </h6>
+                        </div>
+                        <!--    <div class="window_control"><a href="pag.php" class="btn">Register</a></div>     -->
+                        <!-- 
+                        <div class="window_control"> <button id="btnpart1" class="btn" type="button" onclick="ocultar1()">Siguiente</button></div> -->
+                        <div class="window_control"> <input id="btnpart1" name="btnpart1" class="btn cyan lighten-3" type="submit" value="Siguiente" ></input></div>
+                        <div class="window_options">
+                            ¿Ya tienes cuenta? <a href="../index.php" class="lnk">Inicio.</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+
+            <!--           ---      PARTE CAMIONERO          ---     -->
+
+
+            <div class="window" id="ParteCamionero">
+                <div class="window_title">
+                    Registrarse
+                </div>
+
+                <div class="window_container">
+                    <form  method="POST">
+
+                        <label class="lbl" for="txtUsuario">Tipo de Camion:</label>
+                        <input class="txt" type="text" id="txtUsuario" name="txtUsuario" required>
+
+                        <label class="lbl" for="txtUsuario">Patente:</label>
+                        <input class="txt" type="text" id="txtUsuario" name="txtUsuario" required>
+
+                        <div class="window_control">
+                            <!-- Falta el Control de Registrase etc y el boton 
+                                
+                            <div class="window_control"><a href="../Control/camionero.php" name="registrarse" class="btn">Registrase</a></div>-->
+                            <div class="window_control"><input type="submit" class="btn" id="btnRegisterCamionero" name="registrarse" value="Registrarse"></div> 
+                            <div class="window_options"> ¿Quieres Completar la informacion luego? <a href="../index.php" class="lnk">Si.</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+
+
+
+            <!--             ----    PARTE EMPRESA                   ---    -->
+            <div class="window" id="ParteEmpresa">
+                <div class="window_title">
+                    Registrarse
+                </div>
+
+                <div class="window_container">
+                    <form  method="POST">
+
+                        <label class="lbl" for="txtUsuario">Tipo de Empresa:</label>
+                        <input class="txt" type="text" id="txtTipoEmpresa" name="txtTipoEmpresa" required>
+
+                        <label class="lbl" for="txtUsuario">Datos Empresa:</label>
+                        <input class="txt" type="text" id="txtDatosEmpresa" name="txtDatosEmpresa" required>
+
+
+                        <div class="window_control">
+
+                            <!-- Hya que hacer los botones y Controlo etc     -->
+                            <div class="window_control"><input type="submit" class="btn" id="btnRegisterEmpresa" name="registrarse" value="Registrarse"></div> 
+                            <!-- <div class="window_control"> <a href="../Control/camionero.php?"   class="btn">Registrase</a></div> -->
+
+                            <div class="window_options"> ¿Quieres Completar la informacion luego? <a href="../index.php" class="lnk">Si.</a> </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+
+
+
+
+    <footer class="page-footer cyan lighten-3">
+        <div class="container">
+            <div class="row">
+            <div class="col l6 s12">
+                <h5 class="white-text ">SpoTruck</h5>
+                <p class="grey-text text-lighten-4">Presentado por Guillermo Riedel, Ana Lucía Basaldúa y Martina Villanueva.</p>
+            </div>
+            <div class="col l4 offset-l2 s12">
+                <h5 class="white-text">Links</h5>
+                <ul>
+                <li><a class="grey-text text-lighten-3" href="#!">Privacidad</a></li>
+                <li><a class="grey-text text-lighten-3" href="#!">Accesibilidad</a></li>
+                <li><a class="grey-text text-lighten-3" href="#!">Términos</a></li>
+                </ul>
+            </div>
+            </div>
+        </div>
+        <div class="footer-copyright">
+            <div class="container">
+            © 2022 SpoTruck Technologies, Inc.
+            <a class="grey-text text-lighten-4 right" href="#!">Quiénes somos</a>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
+
+    
+    <script>
+        document.getElementById('ParteEmpresa').style.display = 'none';
+
+        document.getElementById('ParteCamionero').style.display = 'none';
+
+        function ocultar1() {
+            document.getElementById('p1').style.display = 'none';
+
+            if (document.getElementById('UsCam').checked) {
+                document.getElementById('ParteCamionero').style.display = 'inline';
+                document.getElementById('ParteEmpresa').style.display = 'none';
+            } else {
+
+                document.getElementById('ParteEmpresa').style.display = 'inline';
+                document.getElementById('ParteCamionero').style.display = 'none';
+            }
+
+        }
+    </script> 
+
+    <!-- Compiled and minified JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script type="text/JavaScript">
+        $(document).ready(function() {
+            M.updateTextFields();
+        });
+    </script>
