@@ -7,6 +7,7 @@ const navItems: { to: string; label: string; icon: string; driverOnly?: boolean 
   { to: '/trips', label: 'Viajes', icon: '🚚' },
   { to: '/auctions', label: 'Subastas', icon: '🔨' },
   { to: '/explore', label: 'Explorar', icon: '🗺️', driverOnly: true },
+  { to: '/my-bids', label: 'Postulaciones', icon: '🔨', driverOnly: true },
   { to: '/stats', label: 'Estadísticas', icon: '📈' },
   { to: '/profile', label: 'Mi perfil', icon: '👤' },
 ]

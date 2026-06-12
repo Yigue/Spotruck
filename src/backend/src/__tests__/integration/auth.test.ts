@@ -39,7 +39,7 @@ describe('Auth Flow', () => {
           password: 'Password123',
           role: 'COMPANY',
           companyName: 'Acme SRL',
-          companyCuit: '20-99999999-1',
+          companyCuit: '20-99999999-9',
           phone: '+549****1111',
         })
 

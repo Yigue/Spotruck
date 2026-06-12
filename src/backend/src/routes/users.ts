@@ -1,11 +1,68 @@
 import { Router } from 'express'
+import path from 'path'
+import fs from 'fs'
+import multer from 'multer'
 import { z } from 'zod'
 import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
 import { notificationService } from '../services/notificationService.js'
+import { validateCuit, CUIT_ERROR } from '../utils/cuit.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
 
 const router = Router()
+
+// ─── Uploads (multer, disco local; ver wave1 del SDD) ────────────────────────
+const UPLOADS_DIR = path.resolve('uploads')
+
+function makeUploader(subdir: string, maxMb: number, mimes: string[]) {
+  const dir = path.join(UPLOADS_DIR, subdir)
+  fs.mkdirSync(dir, { recursive: true })
+  return multer({
+    storage: multer.diskStorage({
+      destination: dir,
+      filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase() || '.bin'
+        cb(null, `${req.user!.sub}-${Date.now()}${ext}`)
+      },
+    }),
+    limits: { fileSize: maxMb * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      cb(null, mimes.includes(file.mimetype))
+    },
+  })
+}
+
+const avatarUpload = makeUploader('avatars', 2, ['image/jpeg', 'image/png', 'image/webp'])
+const docUpload = makeUploader('documents', 5, ['image/jpeg', 'image/png', 'application/pdf'])
+
+// POST /users/me/avatar — foto de perfil (jpg/png/webp, máx 2 MB)
+router.post('/me/avatar', authenticate, avatarUpload.single('avatar'), async (req, res, next) => {
+  try {
+    if (!req.file) return next(errors.badRequest('Subí una imagen jpg, png o webp de hasta 2 MB'))
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`
+    await prisma.user.update({ where: { id: req.user!.sub }, data: { avatarUrl } })
+    res.json({ data: { avatarUrl } })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /users/me/documents — documentación del transportista para la
+// verificación (licencia, cédula, seguro; jpg/png/pdf, máx 5 MB)
+router.post('/me/documents', authenticate, requireRole('DRIVER'), docUpload.single('document'), async (req, res, next) => {
+  try {
+    if (!req.file) return next(errors.badRequest('Subí un jpg, png o pdf de hasta 5 MB'))
+    const url = `/uploads/documents/${req.file.filename}`
+    const updated = await prisma.user.update({
+      where: { id: req.user!.sub },
+      data: { documentsUrl: { push: url } },
+      select: { documentsUrl: true },
+    })
+    res.json({ data: updated })
+  } catch (err) {
+    next(err)
+  }
+})
 
 // POST /users/me/request-verification — el transportista pide la revisión
 // de su documentación (licencia + camiones cargados)
@@ -79,24 +136,6 @@ router.patch('/:id/verify', authenticate, requireRole('ADMIN'), async (req, res,
   }
 })
 
-// POST /users/me/documents — Subida de documentación (Placeholder para Fase 3)
-router.post('/me/documents', authenticate, async (req, res, next) => {
-  try {
-    // Acá iría la integración con multer + S3
-    // const fileUrl = await storageService.upload(req.file)
-    const fileUrl = 'https://fake-s3-bucket.com/uploads/driver_license_placeholder.jpg'
-
-    const updated = await prisma.user.update({
-      where: { id: req.user!.sub },
-      data: { driverLicenseUrl: fileUrl },
-      select: { id: true, driverLicenseUrl: true }
-    })
-    res.json({ data: updated })
-  } catch (err) {
-    next(err)
-  }
-})
-
 router.get('/me', authenticate, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.sub },
@@ -105,6 +144,7 @@ router.get('/me', authenticate, async (req, res) => {
       companyCuit: true, phone: true, driverLicense: true,
       vehiclePlate: true, vehicleType: true, vehicleCapacity: true,
       preferredZone: true, emailVerified: true, documentsStatus: true,
+      avatarUrl: true, documentsUrl: true,
       address: true, website: true, sector: true,
       ratingAvg: true, ratingCount: true, tripsCompleted: true,
       trustScore: true, createdAt: true,
@@ -120,7 +160,7 @@ router.get('/me', authenticate, async (req, res) => {
 
 const updateUserSchema = z.object({
   companyName: z.string().optional(),
-  companyCuit: z.string().optional(),
+  companyCuit: z.string().refine((v) => validateCuit(v), CUIT_ERROR).optional(),
   phone: z.string().optional(),
   driverLicense: z.string().optional(),
   vehiclePlate: z.string().optional(),
@@ -154,7 +194,7 @@ router.get('/:id/profile', authenticate, async (req, res, next) => {
       select: {
         id: true, role: true, companyName: true, companyCuit: true,
         phone: true, address: true, website: true, sector: true,
-        documentsStatus: true,
+        documentsStatus: true, avatarUrl: true,
         ratingAvg: true, ratingCount: true,
         tripsCompleted: true, trustScore: true, createdAt: true,
         trucks: {

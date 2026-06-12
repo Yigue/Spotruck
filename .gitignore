@@ -1,2 +1,5 @@
 node_modules/
 .env
+
+# Archivos subidos por usuarios (avatares, documentos)
+src/backend/uploads/

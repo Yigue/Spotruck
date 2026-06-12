@@ -48,6 +48,7 @@ const tripWhereSchema = z.object({
   lat: z.string().optional(),
   lng: z.string().optional(),
   radius: z.string().optional(),
+  mine: z.string().optional(),
   page: z.string().optional(),
   limit: z.string().optional(),
 })

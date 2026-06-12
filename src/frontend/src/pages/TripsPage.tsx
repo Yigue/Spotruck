@@ -63,6 +63,7 @@ export default function TripsPage() {
   })
 
   // Filters
+  const [mineOnly, setMineOnly] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
   const [cargoTypeFilter, setCargoTypeFilter] = useState('')
   const [minPrice, setMinPrice] = useState('')
@@ -79,6 +80,7 @@ export default function TripsPage() {
           limit: pagination.limit,
         }
 
+        if (mineOnly) params.mine = 'true'
         if (statusFilter) params.status = statusFilter
         if (cargoTypeFilter) params.cargoType = cargoTypeFilter
         if (minPrice) params.minPrice = parseFloat(minPrice)
@@ -101,7 +103,7 @@ export default function TripsPage() {
     }
 
     fetchTrips()
-  }, [pagination.page, statusFilter, cargoTypeFilter, minPrice, maxPrice])
+  }, [pagination.page, mineOnly, statusFilter, cargoTypeFilter, minPrice, maxPrice])
 
   const handlePageChange = (newPage: number) => {
     setPagination((prev) => ({ ...prev, page: newPage }))
@@ -130,11 +132,31 @@ export default function TripsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <h1 className="text-2xl font-bold">Viajes</h1>
         <Button variant="accent" onClick={() => navigate('/trips/new')}>
           + Publicar viaje
         </Button>
+      </div>
+
+      {/* Pestañas: todos / mis viajes (SDD wave1) */}
+      <div className="flex gap-2 mb-4">
+        {[
+          { mine: false, label: 'Todos' },
+          { mine: true, label: 'Mis viajes' },
+        ].map((tab) => (
+          <button
+            key={tab.label}
+            onClick={() => setMineOnly(tab.mine)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              mineOnly === tab.mine
+                ? 'bg-primary text-white'
+                : 'bg-surface border border-secondary-500/20 text-text-muted hover:border-primary'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {auctionId && (

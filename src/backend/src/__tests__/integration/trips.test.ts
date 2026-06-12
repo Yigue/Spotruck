@@ -14,7 +14,7 @@ async function registerCompany(email: string, password = 'Password123') {
     password,
     role: 'COMPANY',
     companyName: 'Test Company',
-    companyCuit: '20-12345678-1',
+    companyCuit: '20-12345678-6',
   })
   return res.body.data.accessToken as string
 }

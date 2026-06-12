@@ -7,6 +7,7 @@ import { config } from '../config/index.js'
 import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
 import { emailService } from '../services/emailService.js'
+import { validateCuit, CUIT_ERROR } from '../utils/cuit.js'
 import { authenticate } from '../middleware/auth.js'
 import type { Request, Response } from 'express'
 
@@ -26,7 +27,7 @@ const registerSchema = z.object({
   password: passwordSchema,
   role: z.enum(['COMPANY', 'DRIVER']),
   companyName: z.string().optional(),
-  companyCuit: z.string().optional(),
+  companyCuit: z.string().refine((v) => validateCuit(v), CUIT_ERROR).optional(),
   driverLicense: z.string().optional(),
   vehiclePlate: z.string().optional(),
   vehicleType: z.string().optional(),

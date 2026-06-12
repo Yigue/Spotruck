@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { useAuthStore } from '../hooks/useAuthStore'
+import { validateCuit, CUIT_ERROR } from '../utils/cuit'
 
 const passwordRules = [
   { label: 'Mínimo 8 caracteres', test: (p: string) => p.length >= 8 },
@@ -53,6 +54,10 @@ export default function RegisterPage() {
   }
 
   const register = async (skipDetails: boolean) => {
+    if (!skipDetails && form.companyCuit && !validateCuit(form.companyCuit)) {
+      toast.error(CUIT_ERROR)
+      return
+    }
     setLoading(true)
     try {
       const payload: Record<string, string> = {

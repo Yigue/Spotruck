@@ -37,6 +37,7 @@ app.use(helmet())
 app.use(cors({ origin: config.corsOrigin }))
 app.use(morgan('combined'))
 app.use(express.json())
+app.use('/uploads', express.static('uploads'))
 app.use(express.urlencoded({ extended: true }))
 
 // Health check

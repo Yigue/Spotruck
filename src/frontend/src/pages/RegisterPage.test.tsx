@@ -136,7 +136,7 @@ describe('RegisterPage', () => {
     renderRegister()
     completeStep1('COMPANY')
     fireEvent.change(screen.getByLabelText(/razón social/i), { target: { value: 'Acme' } })
-    fireEvent.change(screen.getByLabelText(/cuit/i), { target: { value: '20-12345678-1' } })
+    fireEvent.change(screen.getByLabelText(/cuit/i), { target: { value: '20-12345678-6' } })
     fireEvent.click(screen.getByRole('button', { name: /registrarse/i }))
 
     await waitFor(() => {

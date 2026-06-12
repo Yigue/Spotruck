@@ -9,6 +9,8 @@ import { Badge } from '../components/ui/Badge'
 import { Modal } from '../components/ui/Modal'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { Spinner } from '../components/ui/Spinner'
+import { Avatar } from '../components/ui/Avatar'
+import { validateCuit, CUIT_ERROR } from '../utils/cuit'
 
 interface Truck {
   id: string
@@ -24,6 +26,8 @@ interface Me {
   id: string
   email: string
   emailVerified?: boolean
+  avatarUrl?: string | null
+  documentsUrl?: string[]
   documentsStatus?: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED'
   role: 'COMPANY' | 'DRIVER' | 'ADMIN'
   companyName?: string
@@ -97,6 +101,10 @@ export default function ProfilePage() {
 
   const handleSave = async (e: FormEvent) => {
     e.preventDefault()
+    if (form.companyCuit && !validateCuit(form.companyCuit)) {
+      toast.error(CUIT_ERROR)
+      return
+    }
     setSaving(true)
     try {
       const payload = Object.fromEntries(
@@ -174,6 +182,21 @@ export default function ProfilePage() {
     }
   }
 
+  const uploadFile = async (endpoint: string, field: string, file: File, okMsg: string) => {
+    const fd = new FormData()
+    fd.append(field, file)
+    try {
+      await api.post(endpoint, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      toast.success(okMsg)
+      loadMe()
+    } catch (err: unknown) {
+      toast.error(
+        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message || 'No se pudo subir el archivo'
+      )
+    }
+  }
+
   if (!me) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -227,6 +250,22 @@ export default function ProfilePage() {
       </div>
 
       <Card>
+        <div className="flex items-center gap-4 mb-6">
+          <Avatar name={me.companyName || me.email} src={me.avatarUrl ?? undefined} size="lg" />
+          <label className="text-sm text-primary font-medium cursor-pointer">
+            Cambiar foto
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) uploadFile('/users/me/avatar', 'avatar', f, 'Foto de perfil actualizada')
+              }}
+            />
+            <span className="block text-xs text-text-muted font-normal">jpg, png o webp · máx 2 MB</span>
+          </label>
+        </div>
         <h2 className="text-lg font-bold mb-4">Datos</h2>
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -301,6 +340,43 @@ export default function ProfilePage() {
               </Button>
             )}
           </div>
+        </Card>
+      )}
+
+      {isDriver && (
+        <Card>
+          <div className="flex items-center justify-between mb-3 gap-4 flex-wrap">
+            <div>
+              <h2 className="text-lg font-bold">Mi documentación</h2>
+              <p className="text-sm text-text-muted">Licencia, cédula y seguro para la verificación</p>
+            </div>
+            <label className="btn-secondary cursor-pointer text-sm">
+              + Subir documento
+              <input
+                type="file"
+                accept="image/jpeg,image/png,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) uploadFile('/users/me/documents', 'document', f, 'Documento subido')
+                }}
+              />
+            </label>
+          </div>
+          {(me.documentsUrl ?? []).length === 0 ? (
+            <p className="text-sm text-text-muted">Sin documentos cargados (jpg, png o pdf · máx 5 MB)</p>
+          ) : (
+            <ul className="text-sm space-y-1">
+              {(me.documentsUrl ?? []).map((url, i) => (
+                <li key={url}>
+                  📄{' '}
+                  <a href={url} target="_blank" rel="noreferrer" className="text-primary font-medium">
+                    Documento {i + 1}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       )}
 

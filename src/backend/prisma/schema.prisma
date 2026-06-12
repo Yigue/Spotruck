@@ -115,6 +115,8 @@ model User {
   // Revisión de documentación del transportista (licencia, cédula, seguro)
   documentsStatus DocumentsStatus @default(NONE) @map("documents_status")
   driverLicenseUrl String? @map("driver_license_url")
+  avatarUrl      String?  @map("avatar_url")
+  documentsUrl   String[] @map("documents_url")
   address        String?
   website        String?
   sector         String?
