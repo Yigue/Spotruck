@@ -48,7 +48,7 @@ const emailDr2 = `hp-driver2-${ts}@test.com`
 console.log('\nHP1 — Registro de empresa y verificación de email')
 let r = await api('POST', '/auth/register', null, {
   email: emailCo, password: 'Password1', role: 'COMPANY',
-  companyName: 'HappyPath SA', companyCuit: '30-11111111-1', phone: '+54 9 11 4444 0001',
+  companyName: 'HappyPath SA', companyCuit: '30-11111111-8', phone: '+54 9 11 4444 0001',
 })
 check('registro empresa devuelve tokens', r.status === 201 && !!r.body.data.accessToken)
 const CO = r.body.data.accessToken
