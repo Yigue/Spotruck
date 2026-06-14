@@ -31,6 +31,10 @@ const createTripSchema = z.object({
   scheduledDate: z.string().datetime(),
   endDate: z.string().datetime().optional(),
   basePrice: z.number().positive(),
+  // Tipo de subasta elegido al publicar (default abierta)
+  auctionType: z.enum(['OPEN', 'DUTCH', 'SEALED']).optional(),
+  // Precio mínimo / reserva (piso al que baja DUTCH; reserva en OPEN/SEALED)
+  reservePrice: z.number().positive().optional(),
   // true = guardar como borrador (no entra en subasta todavía)
   draft: z.boolean().optional(),
 })
@@ -125,17 +129,24 @@ router.get('/:id', authenticate, async (req, res, next) => {
     })
     if (!trip) return next(errors.notFound('Trip'))
 
-    // Los teléfonos de los postulantes solo los ve la empresa dueña del viaje
+    // Los teléfonos de los postulantes solo los ve la empresa dueña del viaje.
+    // En subasta SELLADA, además, un transportista no ve los montos ajenos.
     const isOwner = trip.userId === req.user!.sub || req.user!.role === 'ADMIN'
+    const sealed = trip.auction?.type === 'SEALED'
     const data =
       !isOwner && trip.auction
         ? {
             ...trip,
             auction: {
               ...trip.auction,
-              bids: trip.auction.bids.map((b) =>
-                b.user.id === req.user!.sub ? b : { ...b, user: { ...b.user, phone: null } }
-              ),
+              bids: trip.auction.bids.map((b) => {
+                if (b.user.id === req.user!.sub) return b
+                return {
+                  ...b,
+                  user: { ...b.user, phone: null },
+                  ...(sealed ? { amount: null, sealed: true } : {}),
+                }
+              }),
             },
           }
         : trip
@@ -155,11 +166,38 @@ function auctionEndTime(endDate: Date | null | undefined): Date {
   return endDate && endDate > new Date() ? endDate : fallback
 }
 
+type AuctionType = 'OPEN' | 'DUTCH' | 'SEALED'
+
+// Arma los datos de la subasta según el tipo elegido. DUTCH baja hasta un piso
+// más bajo por defecto (más recorrido de descenso) que la reserva OPEN/SEALED.
+function buildAuctionData(
+  tripId: string,
+  basePrice: Prisma.Decimal | number,
+  endDate: Date | null | undefined,
+  type: AuctionType,
+  reservePrice?: number,
+) {
+  const base = new Prisma.Decimal(basePrice)
+  const defaultPct = type === 'DUTCH' ? 0.7 : 0.9
+  const reserve = reservePrice
+    ? new Prisma.Decimal(reservePrice)
+    : base.mul(defaultPct).toDecimalPlaces(2)
+  return {
+    tripId,
+    type,
+    startTime: new Date(),
+    endTime: auctionEndTime(endDate),
+    reservePrice: reserve,
+    currentPrice: base, // DUTCH arranca en basePrice y desciende
+    status: 'OPEN' as const,
+  }
+}
+
 // POST /trips — crea la publicación y abre la subasta en la misma transacción.
 // Con draft=true queda en borrador (sin subasta) para publicar después.
 router.post('/', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res, next) => {
   try {
-    const { draft, ...data } = createTripSchema.parse(req.body)
+    const { draft, auctionType, reservePrice, ...data } = createTripSchema.parse(req.body)
 
     const trip = await prisma.$transaction(async (tx) => {
       const created = await tx.trip.create({
@@ -173,15 +211,7 @@ router.post('/', authenticate, requireRole('COMPANY', 'ADMIN'), async (req, res,
       })
       if (!draft) {
         await tx.auction.create({
-          data: {
-            tripId: created.id,
-            type: 'OPEN',
-            startTime: new Date(),
-            endTime: auctionEndTime(created.endDate),
-            reservePrice: new Prisma.Decimal(created.basePrice).mul(0.9).toDecimalPlaces(2),
-            currentPrice: created.basePrice,
-            status: 'OPEN',
-          },
+          data: buildAuctionData(created.id, created.basePrice, created.endDate, auctionType ?? 'OPEN', reservePrice),
         })
       }
       return created
@@ -207,18 +237,17 @@ router.post('/:id/publish', authenticate, requireRole('COMPANY', 'ADMIN'), async
     }
     if (trip.status !== 'DRAFT') return next(errors.badRequest('Only DRAFT trips can be published'))
 
+    const { auctionType, reservePrice } = z
+      .object({
+        auctionType: z.enum(['OPEN', 'DUTCH', 'SEALED']).optional(),
+        reservePrice: z.number().positive().optional(),
+      })
+      .parse(req.body ?? {})
+
     const [updated] = await prisma.$transaction([
       prisma.trip.update({ where: { id: trip.id }, data: { status: 'AUCTION' } }),
       prisma.auction.create({
-        data: {
-          tripId: trip.id,
-          type: 'OPEN',
-          startTime: new Date(),
-          endTime: auctionEndTime(trip.endDate),
-          reservePrice: new Prisma.Decimal(trip.basePrice).mul(0.9).toDecimalPlaces(2),
-          currentPrice: trip.basePrice,
-          status: 'OPEN',
-        },
+        data: buildAuctionData(trip.id, trip.basePrice, trip.endDate, auctionType ?? 'OPEN', reservePrice),
       }),
     ])
 
@@ -294,7 +323,8 @@ router.put('/:id', authenticate, async (req, res, next) => {
       return next(errors.badRequest('Cannot edit trip in current status'))
     }
 
-    const { draft: _draft, ...data } = updateTripSchema.parse(req.body)
+    // draft/auctionType/reservePrice no son columnas de Trip: se excluyen
+    const { draft: _draft, auctionType: _at, reservePrice: _rp, ...data } = updateTripSchema.parse(req.body)
 
     const updated = await prisma.trip.update({
       where: { id: req.params.id as string },

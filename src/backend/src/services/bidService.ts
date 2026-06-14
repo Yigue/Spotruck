@@ -116,6 +116,59 @@ export const bidService = {
     return updatedBid
   },
 
+  // Subasta holandesa: el transportista "toma" el precio actual y gana al
+  // instante. El lock garantiza que solo el primero en tomar se queda el viaje.
+  async takeDutch(auctionId: string, driverId: string, truckId?: string) {
+    const auction = await prisma.auction.findUnique({
+      where: { id: auctionId },
+      include: { trip: true },
+    })
+    if (!auction) throw errors.notFound('Auction')
+    if (auction.type !== 'DUTCH') throw errors.badRequest('Auction is not DUTCH')
+    if (auction.status !== 'OPEN') throw errors.badRequest('Auction is not open')
+    if (new Date() > auction.endTime) throw errors.badRequest('Auction has ended')
+
+    if (truckId) {
+      const truck = await prisma.truck.findUnique({ where: { id: truckId } })
+      if (!truck || truck.ownerId !== driverId) throw errors.badRequest('Invalid truck')
+      if (!truck.active) throw errors.badRequest('Truck is not active')
+      if (auction.trip.weightKg && truck.capacityKg < auction.trip.weightKg) {
+        throw errors.badRequest('Truck capacity is below the cargo weight')
+      }
+    }
+
+    const price = new Prisma.Decimal(auction.currentPrice)
+
+    // Lock: el primero en tomar cierra la subasta; el resto recibe conflicto
+    const locked = await prisma.auction.updateMany({
+      where: { id: auctionId, status: 'OPEN' },
+      data: { status: 'SETTLED', currentPrice: price },
+    })
+    if (locked.count === 0) throw errors.conflict('Alguien tomó el viaje primero')
+
+    const [bid] = await prisma.$transaction([
+      prisma.bid.create({
+        data: { auctionId, userId: driverId, amount: price, truckId, status: 'ACCEPTED' },
+      }),
+      prisma.trip.update({ where: { id: auction.tripId }, data: { status: 'ASSIGNED' } }),
+    ])
+
+    const payment = await paymentService.createHold(auction.tripId, driverId)
+
+    broadcastToAuction(auctionId, { status: 'SETTLED', currentPrice: price.toNumber() })
+    broadcastToTrip(auction.tripId, { type: 'trip_update', status: 'ASSIGNED' })
+
+    await notificationService.createInApp(
+      auction.trip.userId,
+      'BID_ACCEPTED',
+      'Un transportista tomó tu viaje',
+      `Aceptaron ${auction.trip.originAddress} → ${auction.trip.destAddress} por ${price} ARS`,
+      { tripId: auction.tripId, bidId: bid.id }
+    )
+
+    return { bid, payment }
+  },
+
   // La empresa acepta una oferta: cierra la subasta, rechaza el resto,
   // asigna el viaje y crea el hold de pago (flujo "Aceptar/Rechazar" de la app original)
   async acceptBid(bidId: string, requesterId: string, requesterRole: string) {

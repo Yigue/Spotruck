@@ -47,6 +47,9 @@ export const config = {
     antiSnipingExtensionMinutes: 2,
     minBidDecrementPercent: 0.10,
     maxExtensions: 3,
+    // DUTCH: el precio baja de basePrice hacia reservePrice a lo largo de la
+    // ventana de la subasta. El tick recalcula el precio según el tiempo.
+    dutchTickSeconds: 15,
   },
 
   payment: {

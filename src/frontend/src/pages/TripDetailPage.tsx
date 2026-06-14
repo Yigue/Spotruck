@@ -448,6 +448,7 @@ export default function TripDetailPage() {
                   <BidForm
                     auctionId={trip.auction.id}
                     currentPrice={trip.auction.currentPrice}
+                    auctionType={trip.auction.type}
                     cargoWeightKg={trip.weightKg}
                     onBidPlaced={refreshTrip}
                   />

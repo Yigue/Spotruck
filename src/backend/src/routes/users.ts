@@ -1,39 +1,16 @@
 import { Router } from 'express'
-import path from 'path'
-import fs from 'fs'
-import multer from 'multer'
 import { z } from 'zod'
 import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
 import { notificationService } from '../services/notificationService.js'
 import { validateCuit, CUIT_ERROR } from '../utils/cuit.js'
+import { makeUploader, IMG_MIMES, DOC_MIMES } from '../utils/uploads.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
 
 const router = Router()
 
-// ─── Uploads (multer, disco local; ver wave1 del SDD) ────────────────────────
-const UPLOADS_DIR = path.resolve('uploads')
-
-function makeUploader(subdir: string, maxMb: number, mimes: string[]) {
-  const dir = path.join(UPLOADS_DIR, subdir)
-  fs.mkdirSync(dir, { recursive: true })
-  return multer({
-    storage: multer.diskStorage({
-      destination: dir,
-      filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase() || '.bin'
-        cb(null, `${req.user!.sub}-${Date.now()}${ext}`)
-      },
-    }),
-    limits: { fileSize: maxMb * 1024 * 1024 },
-    fileFilter: (_req, file, cb) => {
-      cb(null, mimes.includes(file.mimetype))
-    },
-  })
-}
-
-const avatarUpload = makeUploader('avatars', 2, ['image/jpeg', 'image/png', 'image/webp'])
-const docUpload = makeUploader('documents', 5, ['image/jpeg', 'image/png', 'application/pdf'])
+const avatarUpload = makeUploader('avatars', 2, IMG_MIMES)
+const docUpload = makeUploader('documents', 5, DOC_MIMES)
 
 // POST /users/me/avatar — foto de perfil (jpg/png/webp, máx 2 MB)
 router.post('/me/avatar', authenticate, avatarUpload.single('avatar'), async (req, res, next) => {

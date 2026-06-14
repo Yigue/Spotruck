@@ -105,7 +105,7 @@ export function BidDetailModal({ bid, canDecide, onClose, onDecided }: BidDetail
             )}
             <div className="flex justify-between py-2">
               <span className="text-text-muted">Precio propuesto</span>
-              <span className="font-mono font-semibold text-accent">{formatPrice(bid.amount)}</span>
+              <span className="font-mono font-semibold text-accent">{bid.amount == null ? 'Oferta sellada' : formatPrice(bid.amount)}</span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-text-muted">Día de postulación</span>

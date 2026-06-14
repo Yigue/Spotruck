@@ -5,6 +5,7 @@ import { prisma } from '../models/prisma.js'
 import { config } from '../config/index.js'
 import { errors } from '../utils/errors.js'
 import { notificationService } from '../services/notificationService.js'
+import { bidService } from '../services/bidService.js'
 import { broadcastToAuction } from '../websocket/index.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
 
@@ -144,6 +145,13 @@ router.post('/:id/bid', authenticate, requireRole('DRIVER'), async (req, res, ne
     if (!auction) return next(errors.notFound('Auction'))
     if (auction.status !== 'OPEN') return next(errors.badRequest('Auction is not open'))
     if (new Date() > auction.endTime) return next(errors.badRequest('Auction has ended'))
+
+    // DUTCH: "¡Tomar!" — acepta el precio actual y gana al instante
+    if (auction.type === 'DUTCH') {
+      const result = await bidService.takeDutch(auctionId, req.user!.sub, truckId)
+      res.status(201).json({ data: result.bid })
+      return
+    }
 
     const minBid = new Prisma.Decimal(auction.currentPrice).mul(1 - config.auction.minBidDecrementPercent)
     if (minBid.lte(amount)) return next(errors.badRequest(`Bid must be lower than ${minBid}`))

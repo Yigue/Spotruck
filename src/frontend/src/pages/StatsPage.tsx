@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import api from '../utils/api'
 import { Card } from '../components/ui/Card'
-import { Spinner } from '../components/ui/Spinner'
+import { Skeleton } from '../components/ui/Skeleton'
 import { BarChart, HBarChart, KpiCard } from '../components/charts/SimpleCharts'
 
 interface MonthDatum {
@@ -59,8 +59,18 @@ export default function StatsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner />
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-40" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-56" />
+          ))}
+        </div>
       </div>
     )
   }

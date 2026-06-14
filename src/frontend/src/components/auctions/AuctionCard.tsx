@@ -61,16 +61,23 @@ export function AuctionCard({ auction, trip, onClick }: AuctionCardProps) {
 
         {/* Current price + countdown en vivo */}
         <div className="flex items-center justify-between">
-          <span className="text-2xl font-mono font-bold text-accent">
-            {formatPrice(auction.currentPrice)}
-          </span>
+          <div>
+            <span className={`font-mono font-bold text-accent ${auction.type === 'DUTCH' ? 'text-3xl' : 'text-2xl'}`}>
+              {formatPrice(auction.currentPrice)}
+            </span>
+            {auction.type === 'DUTCH' && auction.status === 'OPEN' && (
+              <span className="block text-xs text-warning font-medium">⏬ Precio baja en vivo</span>
+            )}
+          </div>
           <AuctionCountdown endTime={auction.endTime} status={auction.status} />
         </div>
 
-        {/* Bid count */}
-        <div className="text-sm text-secondary-500">
-          {bidCount} oferta{bidCount !== 1 ? 's' : ''}
-        </div>
+        {/* Bid count — en SEALED no se revela cuántos compiten */}
+        {auction.type !== 'SEALED' && (
+          <div className="text-sm text-secondary-500">
+            {bidCount} oferta{bidCount !== 1 ? 's' : ''}
+          </div>
+        )}
       </div>
     </Card>
   )

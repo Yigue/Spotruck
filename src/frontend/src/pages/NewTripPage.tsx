@@ -132,6 +132,8 @@ export default function NewTripPage() {
     scheduledDate: '',
     endDate: '',
     basePrice: '',
+    auctionType: 'OPEN',
+    reservePrice: '',
   })
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -215,6 +217,8 @@ export default function NewTripPage() {
         scheduledDate: new Date(form.scheduledDate).toISOString(),
         endDate: form.endDate ? new Date(form.endDate).toISOString() : undefined,
         basePrice: parseFloat(form.basePrice),
+        auctionType: form.auctionType,
+        reservePrice: form.reservePrice ? parseFloat(form.reservePrice) : undefined,
       }
 
       const { data } = await api.post('/trips', payload)
@@ -360,6 +364,34 @@ export default function NewTripPage() {
             required
             placeholder="Ej: 45000"
           />
+
+          {/* Tipo de subasta */}
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Tipo de subasta"
+              name="auctionType"
+              options={[
+                { value: 'OPEN', label: 'Abierta (ofertas a la baja)' },
+                { value: 'DUTCH', label: 'Holandesa (precio que baja solo)' },
+                { value: 'SEALED', label: 'Sellada (ofertas privadas)' },
+              ]}
+              value={form.auctionType}
+              onChange={handleChange}
+            />
+            <Input
+              label={form.auctionType === 'DUTCH' ? 'Precio mínimo (piso)' : 'Precio de reserva (opcional)'}
+              name="reservePrice"
+              type="number"
+              value={form.reservePrice}
+              onChange={handleChange}
+              placeholder="Opcional"
+            />
+          </div>
+          <p className="text-xs text-text-muted -mt-2">
+            {form.auctionType === 'OPEN' && 'Los transportistas ofertan compitiendo a la baja.'}
+            {form.auctionType === 'DUTCH' && 'El precio arranca en el base y baja con el tiempo hasta el piso; gana el primero que lo toma.'}
+            {form.auctionType === 'SEALED' && 'Cada transportista envía una oferta privada; vos elegís la mejor.'}
+          </p>
 
           <div className="flex gap-3 pt-4">
             <Button type="submit" variant="accent" loading={loading}>

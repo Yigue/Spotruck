@@ -5,8 +5,9 @@ import { BidDetailModal } from './BidDetailModal'
 
 export interface BidWithDetails {
   id: string
-  amount: number
+  amount: number | null
   note?: string
+  sealed?: boolean
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN'
   createdAt: string
   user: {
@@ -29,6 +30,10 @@ interface BidListProps {
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(price)
+
+// Monto del postulante; en subasta sellada los ajenos vienen redactados
+const showAmount = (b: BidWithDetails) =>
+  b.amount == null ? 'Oferta sellada' : formatPrice(b.amount)
 
 const statusBadge: Record<BidWithDetails['status'], { label: string; variant: 'success' | 'error' | 'info' | 'warning' }> = {
   PENDING: { label: 'Pendiente', variant: 'info' },
@@ -74,7 +79,7 @@ export function BidList({ bids, canDecide, onDecided }: BidListProps) {
                 </p>
               </div>
               <div className="text-right shrink-0">
-                <p className="font-mono font-semibold text-accent">{formatPrice(bid.amount)}</p>
+                <p className="font-mono font-semibold text-accent">{showAmount(bid)}</p>
                 <Badge variant={badge.variant}>{badge.label}</Badge>
               </div>
             </button>
@@ -109,7 +114,7 @@ export function BidList({ bids, canDecide, onDecided }: BidListProps) {
                     )}
                   </td>
                   <td className="py-3 pr-4 font-mono font-semibold text-accent">
-                    {formatPrice(bid.amount)}
+                    {showAmount(bid)}
                   </td>
                   <td className="py-3 pr-4">{bid.truck ? bid.truck.plate : '—'}</td>
                   <td className="py-3 pr-4 text-text-muted">

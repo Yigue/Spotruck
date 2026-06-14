@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { TripCard } from '../components/trips/TripCard'
 import { EmptyState } from '../components/ui/EmptyState'
-import { Spinner } from '../components/ui/Spinner'
+import { SkeletonCard } from '../components/ui/Skeleton'
 import { Card } from '../components/ui/Card'
 import { Select } from '../components/ui/Select'
 import { Input } from '../components/ui/Input'
@@ -236,8 +236,10 @@ export default function TripsPage() {
 
       {/* Loading state */}
       {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Spinner />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
         </div>
       )}
 

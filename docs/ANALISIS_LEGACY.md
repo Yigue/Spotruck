@@ -39,8 +39,10 @@ deprecado, sin CSRF ni expiración de sesión — todo resuelto por diseño
 | `trips` mine=true ("Mis viajes") | ✅ backend + pestañas en /trips |
 | `user-avatar-upload` | ✅ multer 2MB jpg/png/webp + UI en perfil + static /uploads |
 | `driver-document-upload` | ✅ multer 5MB jpg/png/pdf + UI en perfil (User.documentsUrl[]) |
-| `auction-type-ui` — SEALED | ✅ aviso "subasta sellada" (ofertas ajenas privadas en UI) |
-| `auction-type-ui` — DUTCH | ⏳ requiere motor de decremento en backend (no existe); pendiente |
+| `auction-type-ui` — SEALED | ✅ completo: montos ajenos redactados **en el backend** (no solo UI) + aviso de privacidad |
+| `auction-type-ui` — DUTCH | ✅ completo: selector de tipo al publicar, motor de decremento determinístico (tick cada 15s), botón "¡Tomar!" con confirmación y adjudicación inmediata con lock |
+| selección de tipo de subasta al publicar | ✅ `NewTripPage` + `POST /trips`/`/publish` aceptan `auctionType` y `reservePrice` (antes estaba hardcodeado OPEN) |
+| documentos de camión | ✅ upload real con multer (reemplazó el placeholder fake-S3) |
 
 ## Bug crítico encontrado y corregido en esta pasada
 El commit que agregó wave1 al backend declaró `driverLicenseUrl`/`documentsUrl`

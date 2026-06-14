@@ -157,6 +157,35 @@ export const auctionService = {
     return bid
   },
 
+  // Recalcula el precio de las subastas holandesas abiertas según el tiempo
+  // transcurrido (basePrice → reservePrice de forma lineal). Determinístico:
+  // el precio depende del reloj, no de la frecuencia del tick.
+  async tickDutchAuctions() {
+    const now = new Date()
+    const auctions = await prisma.auction.findMany({
+      where: { status: 'OPEN', type: 'DUTCH' },
+      include: { trip: { select: { basePrice: true } } },
+    })
+
+    for (const a of auctions) {
+      const start = a.startTime.getTime()
+      const end = a.endTime.getTime()
+      if (end <= start) continue
+      const base = new Prisma.Decimal(a.trip.basePrice)
+      const floor = a.reservePrice ? new Prisma.Decimal(a.reservePrice) : base.mul(0.5)
+      const ratio = Math.min(1, Math.max(0, (now.getTime() - start) / (end - start)))
+      const newPrice = base.minus(base.minus(floor).mul(ratio)).toDecimalPlaces(2)
+
+      if (!newPrice.equals(a.currentPrice)) {
+        await prisma.auction.update({ where: { id: a.id }, data: { currentPrice: newPrice } })
+        broadcastToAuction(a.id, {
+          currentPrice: newPrice.toNumber(),
+          endTime: a.endTime.toISOString(),
+        })
+      }
+    }
+  },
+
   async getAuctionStatus(auctionId: string) {
     const auction = await prisma.auction.findUnique({
       where: { id: auctionId },
