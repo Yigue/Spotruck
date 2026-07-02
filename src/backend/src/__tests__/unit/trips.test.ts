@@ -2,79 +2,11 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals'
 
 
 
-jest.mock('@prisma/client', () => ({
-
-  PrismaClient: jest.fn().mockImplementation(() => ({
-
-    user: {
-
-      findUnique: jest.fn(),
-
-      create: jest.fn(),
-
-      update: jest.fn(),
-
-    },
-
-    trip: {
-
-      findUnique: jest.fn(),
-
-      findMany: jest.fn(),
-
-      count: jest.fn(),
-
-      create: jest.fn(),
-
-      update: jest.fn(),
-
-      delete: jest.fn(),
-
-    },
-
-    auction: { findUnique: jest.fn(), count: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
-
-    bid: { create: jest.fn(), findMany: jest.fn() },
-
-    payment: { create: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
-
-    rating: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), aggregate: jest.fn() },
-
-  })),
-
-}))
+jest.mock('@prisma/client', () => require('./prismaClientMock'))
 
 
 
-jest.mock('../../config/index', () => ({
-
-  config: {
-
-    jwt: { secret: 'test-secret', accessExpiresIn: '15m', refreshExpiresIn: '7d' },
-
-    db: { url: 'postgresql://test' },
-
-    redis: { url: 'redis://localhost:6379' },
-
-    mercadopago: { accessToken: '', webhookSecret: '' },
-
-    auction: {
-
-      antiSnipingWindowMinutes: 5,
-
-      antiSnipingExtensionMinutes: 2,
-
-      minBidDecrementPercent: 0.10,
-
-      maxExtensions: 3,
-
-    },
-
-    payment: { platformFeePercent: 0.08, holdDurationHours: 72 },
-
-  },
-
-}))
+jest.mock('../../config/index', () => require('./configMock'))
 
 
 
@@ -174,7 +106,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -224,7 +156,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -260,7 +192,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -282,6 +214,114 @@ describe('TripsService', () => {
 
     })
 
+
+
+    it('mine=true como COMPANY filtra por userId propio', async () => {
+
+      mockPrisma.trip.findMany.mockResolvedValue([])
+
+      mockPrisma.trip.count.mockResolvedValue(0)
+
+
+
+      const req = mockReq({}, {}, { mine: 'true', page: '1', limit: '20' })
+
+      const res = mockRes()
+
+      const next = mockNext()
+
+
+
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
+
+      await handler(req, res, next)
+
+
+
+      expect(mockPrisma.trip.findMany).toHaveBeenCalledWith(
+
+        expect.objectContaining({
+
+          where: expect.objectContaining({ userId: 'company-1' }),
+
+        })
+
+      )
+
+    })
+
+
+
+    it('mine=true como DRIVER filtra por oferta aceptada propia', async () => {
+
+      mockPrisma.trip.findMany.mockResolvedValue([])
+
+      mockPrisma.trip.count.mockResolvedValue(0)
+
+
+
+      const req = mockReq({}, {}, { mine: 'true' }, { sub: 'driver-1', role: 'DRIVER', email: 'd@x.com' })
+
+      const res = mockRes()
+
+      const next = mockNext()
+
+
+
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
+
+      await handler(req, res, next)
+
+
+
+      expect(mockPrisma.trip.findMany).toHaveBeenCalledWith(
+
+        expect.objectContaining({
+
+          where: expect.objectContaining({
+
+            auction: { is: { bids: { some: { userId: 'driver-1', status: 'ACCEPTED' } } } },
+
+          }),
+
+        })
+
+      )
+
+    })
+
+
+
+    it('mine=false se comporta igual que sin el parámetro', async () => {
+
+      mockPrisma.trip.findMany.mockResolvedValue([])
+
+      mockPrisma.trip.count.mockResolvedValue(0)
+
+
+
+      const req = mockReq({}, {}, { mine: 'false' })
+
+      const res = mockRes()
+
+      const next = mockNext()
+
+
+
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
+
+      await handler(req, res, next)
+
+
+
+      expect(mockPrisma.trip.findMany).toHaveBeenCalledWith(
+
+        expect.objectContaining({ where: {} })
+
+      )
+
+    })
+
   })
 
 
@@ -293,6 +333,8 @@ describe('TripsService', () => {
       const mockTrip = {
 
         id: 'trip-1',
+
+        userId: 'company-1',
 
         originAddress: 'Buenos Aires',
 
@@ -342,7 +384,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id' && l.route?.methods?.get)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -368,7 +410,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id' && l.route?.methods?.get)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -418,6 +460,10 @@ describe('TripsService', () => {
 
       mockPrisma.trip.create.mockResolvedValue(mockTrip)
 
+      // La ruta re-consulta el viaje con su subasta después de la transacción
+
+      mockPrisma.trip.findUnique.mockResolvedValue(mockTrip)
+
 
 
       const req = mockReq({
@@ -452,7 +498,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/')?.route?.stack[2]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.post)?.route?.stack[2]?.handle
 
       await handler(req, res, next)
 
@@ -522,7 +568,9 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/')?.route?.stack[2]?.handle
+      // El 403 lo emite el middleware requireRole (posición 1 de la cadena)
+
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.post)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -560,7 +608,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id' && l.route?.methods?.put)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -608,7 +656,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id' && l.route?.methods?.put)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -634,7 +682,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id' && l.route?.methods?.put)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -676,7 +724,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id' && l.route?.methods?.put)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -708,7 +756,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id' && l.route?.methods?.put)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -748,7 +796,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id' && l.route?.methods?.delete)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -778,7 +826,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id' && l.route?.methods?.delete)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 
@@ -822,7 +870,7 @@ describe('TripsService', () => {
 
 
 
-      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id')?.route?.stack[1]?.handle
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/:id' && l.route?.methods?.delete)?.route?.stack[1]?.handle
 
       await handler(req, res, next)
 

@@ -1,38 +1,9 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals'
 
-jest.mock('@prisma/client', () => ({
-  PrismaClient: jest.fn().mockImplementation(() => ({
-    user: { findUnique: jest.fn() },
-    trip: { findUnique: jest.fn(), update: jest.fn() },
-    auction: {
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      count: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-    bid: { create: jest.fn(), findMany: jest.fn() },
-    payment: { create: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
-    rating: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), aggregate: jest.fn() },
-  })),
-}))
+jest.mock('@prisma/client', () => require('./prismaClientMock'))
 
 jest.mock('jsonwebtoken')
-jest.mock('../../config/index', () => ({
-  config: {
-    jwt: { secret: 'test-secret', accessExpiresIn: '15m', refreshExpiresIn: '7d' },
-    db: { url: 'postgresql://test' },
-    redis: { url: 'redis://localhost:6379' },
-    mercadopago: { accessToken: '', webhookSecret: '' },
-    auction: {
-      antiSnipingWindowMinutes: 5,
-      antiSnipingExtensionMinutes: 2,
-      minBidDecrementPercent: 0.10,
-      maxExtensions: 3,
-    },
-    payment: { platformFeePercent: 0.08, holdDurationHours: 72 },
-  },
-}))
+jest.mock('../../config/index', () => require('./configMock'))
 
 import { auctionsRouter } from '../../routes/auctions'
 
@@ -88,7 +59,7 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/')?.route?.stack[1]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
       await handler(req, res, next)
 
       expect(res.json).toHaveBeenCalledWith({
@@ -105,7 +76,7 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/')?.route?.stack[1]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
       await handler(req, res, next)
 
       expect(mockPrisma.auction.findMany).toHaveBeenCalledWith(
@@ -126,6 +97,8 @@ describe('AuctionsService', () => {
         reservePrice: 40000,
         trip: {
           id: 'trip-1',
+          // El viewer (company-1) es dueño: los teléfonos no se redactan
+          userId: 'company-1',
           user: { id: 'company-1', companyName: 'Acme', ratingAvg: 4.5 },
         },
         bids: [
@@ -139,7 +112,7 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id')?.route?.stack[1]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id' && l.route?.methods?.get)?.route?.stack[1]?.handle
       await handler(req, res, next)
 
       expect(res.json).toHaveBeenCalledWith({ data: mockAuction })
@@ -152,7 +125,7 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id')?.route?.stack[1]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id' && l.route?.methods?.get)?.route?.stack[1]?.handle
       await handler(req, res, next)
 
       expect(next).toHaveBeenCalled()
@@ -163,11 +136,11 @@ describe('AuctionsService', () => {
 
   describe('POST /auctions', () => {
     it('creates auction for OPEN trip owned by company', async () => {
-      const mockTrip = { id: 'trip-1', userId: 'company-1', status: 'OPEN', basePrice: 50000 }
+      const mockTrip = { id: '11111111-1111-4111-8111-111111111111', userId: 'company-1', status: 'OPEN', basePrice: 50000 }
       mockPrisma.trip.findUnique.mockResolvedValue(mockTrip)
       mockPrisma.auction.create.mockResolvedValue({
         id: 'auction-new',
-        tripId: 'trip-1',
+        tripId: '11111111-1111-4111-8111-111111111111',
         type: 'OPEN',
         currentPrice: 50000,
         reservePrice: 45000,
@@ -176,7 +149,7 @@ describe('AuctionsService', () => {
       mockPrisma.trip.update.mockResolvedValue({ ...mockTrip, status: 'AUCTION' })
 
       const req = mockReq({
-        tripId: 'trip-1',
+        tripId: '11111111-1111-4111-8111-111111111111',
         type: 'OPEN',
         startTime: '2024-12-01T00:00:00Z',
         endTime: '2024-12-02T00:00:00Z',
@@ -185,28 +158,28 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/')?.route?.stack[2]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.post)?.route?.stack[2]?.handle
       await handler(req, res, next)
 
       expect(mockPrisma.auction.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          tripId: 'trip-1',
+          tripId: '11111111-1111-4111-8111-111111111111',
           type: 'OPEN',
           currentPrice: 50000,
           reservePrice: 45000,
-          status: 'PENDING',
+          status: 'OPEN',
         }),
       })
-      expect(mockPrisma.trip.update).toHaveBeenCalledWith({ where: { id: 'trip-1' }, data: { status: 'AUCTION' } })
+      expect(mockPrisma.trip.update).toHaveBeenCalledWith({ where: { id: '11111111-1111-4111-8111-111111111111' }, data: { status: 'AUCTION' } })
       expect(res.status).toHaveBeenCalledWith(201)
     })
 
     it('defaults reservePrice to 90% of trip basePrice', async () => {
-      const mockTrip = { id: 'trip-1', userId: 'company-1', status: 'OPEN', basePrice: 50000 }
+      const mockTrip = { id: '11111111-1111-4111-8111-111111111111', userId: 'company-1', status: 'OPEN', basePrice: 50000 }
       mockPrisma.trip.findUnique.mockResolvedValue(mockTrip)
       mockPrisma.auction.create.mockResolvedValue({
         id: 'auction-new',
-        tripId: 'trip-1',
+        tripId: '11111111-1111-4111-8111-111111111111',
         type: 'OPEN',
         currentPrice: 50000,
         reservePrice: 45000,
@@ -215,7 +188,7 @@ describe('AuctionsService', () => {
       mockPrisma.trip.update.mockResolvedValue({ ...mockTrip, status: 'AUCTION' })
 
       const req = mockReq({
-        tripId: 'trip-1',
+        tripId: '11111111-1111-4111-8111-111111111111',
         type: 'OPEN',
         startTime: '2024-12-01T00:00:00Z',
         endTime: '2024-12-02T00:00:00Z',
@@ -224,21 +197,19 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/')?.route?.stack[2]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.post)?.route?.stack[2]?.handle
       await handler(req, res, next)
 
-      expect(mockPrisma.auction.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ reservePrice: 50000 * 0.9 }),
-        })
-      )
+      const createArgs = (mockPrisma.auction.create as jest.Mock).mock.calls[0][0] as any
+      // reservePrice es un Prisma.Decimal: se compara por valor numérico
+      expect(Number(createArgs.data.reservePrice.toString())).toBe(50000 * 0.9)
     })
 
     it('returns 404 when trip not found', async () => {
       mockPrisma.trip.findUnique.mockResolvedValue(null)
 
       const req = mockReq({
-        tripId: 'non-existent-trip',
+        tripId: '99999999-9999-4999-8999-999999999999',
         type: 'OPEN',
         startTime: '2024-12-01T00:00:00Z',
         endTime: '2024-12-02T00:00:00Z',
@@ -246,7 +217,7 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/')?.route?.stack[2]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.post)?.route?.stack[2]?.handle
       await handler(req, res, next)
 
       expect(next).toHaveBeenCalled()
@@ -255,11 +226,11 @@ describe('AuctionsService', () => {
     })
 
     it('returns 403 when trip belongs to different company', async () => {
-      const mockTrip = { id: 'trip-1', userId: 'other-company', status: 'OPEN', basePrice: 50000 }
+      const mockTrip = { id: '11111111-1111-4111-8111-111111111111', userId: 'other-company', status: 'OPEN', basePrice: 50000 }
       mockPrisma.trip.findUnique.mockResolvedValue(mockTrip)
 
       const req = mockReq({
-        tripId: 'trip-1',
+        tripId: '11111111-1111-4111-8111-111111111111',
         type: 'OPEN',
         startTime: '2024-12-01T00:00:00Z',
         endTime: '2024-12-02T00:00:00Z',
@@ -267,7 +238,7 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/')?.route?.stack[2]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.post)?.route?.stack[2]?.handle
       await handler(req, res, next)
 
       expect(next).toHaveBeenCalled()
@@ -280,7 +251,7 @@ describe('AuctionsService', () => {
       mockPrisma.trip.findUnique.mockResolvedValue(mockTrip)
 
       const req = mockReq({
-        tripId: 'trip-1',
+        tripId: '11111111-1111-4111-8111-111111111111',
         type: 'OPEN',
         startTime: '2024-12-01T00:00:00Z',
         endTime: '2024-12-02T00:00:00Z',
@@ -288,7 +259,7 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/')?.route?.stack[2]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.post)?.route?.stack[2]?.handle
       await handler(req, res, next)
 
       expect(next).toHaveBeenCalled()
@@ -309,11 +280,12 @@ describe('AuctionsService', () => {
         trip: { userId: 'company-1' },
       }
       mockPrisma.auction.findUnique.mockResolvedValue(mockAuction)
-      mockPrisma.bid.create.mockResolvedValue({ id: 'bid-new', auctionId: 'auction-1', userId: 'driver-1', amount: 44000 })
-      mockPrisma.auction.update.mockResolvedValue({ ...mockAuction, currentPrice: 44000 })
+      mockPrisma.bid.create.mockResolvedValue({ id: 'bid-new', auctionId: 'auction-1', userId: 'driver-1', amount: 40000 })
+      mockPrisma.auction.update.mockResolvedValue({ ...mockAuction, currentPrice: 40000 })
 
+      // La regla exige undercut de al menos 10%: 40000 < 45000 * 0.9
       const req = mockReq(
-        { amount: 44000 },
+        { amount: 40000 },
         { id: 'auction-1' },
         {},
         { sub: 'driver-1', role: 'DRIVER', email: 'driver@example.com' }
@@ -321,11 +293,11 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bid')?.route?.stack[2]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bid' && l.route?.methods?.post)?.route?.stack[2]?.handle
       await handler(req, res, next)
 
       expect(mockPrisma.bid.create).toHaveBeenCalledWith({
-        data: { auctionId: 'auction-1', userId: 'driver-1', amount: 44000 },
+        data: { auctionId: 'auction-1', userId: 'driver-1', amount: 40000 },
       })
       expect(res.status).toHaveBeenCalledWith(201)
     })
@@ -337,7 +309,7 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bid')?.route?.stack[2]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bid' && l.route?.methods?.post)?.route?.stack[2]?.handle
       await handler(req, res, next)
 
       expect(next).toHaveBeenCalled()
@@ -353,7 +325,7 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bid')?.route?.stack[2]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bid' && l.route?.methods?.post)?.route?.stack[2]?.handle
       await handler(req, res, next)
 
       expect(next).toHaveBeenCalled()
@@ -377,7 +349,7 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bid')?.route?.stack[2]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bid' && l.route?.methods?.post)?.route?.stack[2]?.handle
       await handler(req, res, next)
 
       expect(next).toHaveBeenCalled()
@@ -401,7 +373,7 @@ describe('AuctionsService', () => {
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bid')?.route?.stack[2]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bid' && l.route?.methods?.post)?.route?.stack[2]?.handle
       await handler(req, res, next)
 
       expect(next).toHaveBeenCalled()
@@ -420,21 +392,21 @@ describe('AuctionsService', () => {
         trip: { userId: 'company-1' },
       }
       mockPrisma.auction.findUnique.mockResolvedValue(mockAuction)
-      mockPrisma.bid.create.mockResolvedValue({ id: 'bid-new', auctionId: 'auction-1', userId: 'driver-1', amount: 44000 })
-      mockPrisma.auction.update.mockResolvedValue({ ...mockAuction, currentPrice: 44000 })
+      mockPrisma.bid.create.mockResolvedValue({ id: 'bid-new', auctionId: 'auction-1', userId: 'driver-1', amount: 40000 })
+      mockPrisma.auction.update.mockResolvedValue({ ...mockAuction, currentPrice: 40000 })
 
-      const req = mockReq({ amount: 44000 }, { id: 'auction-1' }, {}, { sub: 'driver-1', role: 'DRIVER', email: 'd@x.com' })
+      const req = mockReq({ amount: 40000 }, { id: 'auction-1' }, {}, { sub: 'driver-1', role: 'DRIVER', email: 'd@x.com' })
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bid')?.route?.stack[2]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bid' && l.route?.methods?.post)?.route?.stack[2]?.handle
       await handler(req, res, next)
 
       expect(mockPrisma.auction.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             endTime: expect.any(Date),
-            extensionCount: expect.any(Number),
+            extensionCount: { increment: expect.any(Number) },
           }),
         })
       )
@@ -448,18 +420,23 @@ describe('AuctionsService', () => {
         { id: 'bid-2', amount: 44000, createdAt: new Date(), user: { id: 'driver-2', companyName: 'Quick', ratingAvg: 4.6 } },
       ]
       mockPrisma.bid.findMany.mockResolvedValue(mockBids)
+      // La ruta primero verifica que la subasta exista y quién es el dueño
+      mockPrisma.auction.findUnique.mockResolvedValue({ trip: { userId: 'company-1' } })
 
       const req = mockReq({}, { id: 'auction-1' })
       const res = mockRes()
       const next = mockNext()
 
-      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bids')?.route?.stack[1]?.handle
+      const handler = (auctionsRouter as any).stack.find((l: any) => l.route?.path === '/:id/bids' && l.route?.methods?.get)?.route?.stack[1]?.handle
       await handler(req, res, next)
 
       expect(mockPrisma.bid.findMany).toHaveBeenCalledWith({
         where: { auctionId: 'auction-1' },
         orderBy: { createdAt: 'desc' },
-        include: { user: { select: { id: true, companyName: true, ratingAvg: true } } },
+        include: {
+          user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, phone: true, tripsCompleted: true, documentsStatus: true, avatarUrl: true } },
+          truck: { select: { id: true, plate: true, type: true, capacityKg: true } },
+        },
       })
       expect(res.json).toHaveBeenCalledWith({ data: mockBids })
     })
