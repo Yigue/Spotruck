@@ -245,3 +245,17 @@ DRAFT → OPEN → AUCTION → ASSIGNED → IN_PROGRESS → DELIVERED → SETTLE
 - [ ] Trip list supports filtering by status, date range, and price range
 - [ ] Trip list supports pagination (page, limit)
 - [ ] GET /trips/:id returns full trip details for authorized users
+
+---
+
+## 8. Wave 1 Delta — My Trips Filter (`mine=true`)
+
+Sincronizado desde `openspec/changes/wave1-missing-pages-and-validation/specs/trips/spec.md`.
+
+- `GET /trips?mine=true` SHALL devolver solo los viajes propios del usuario autenticado:
+  - COMPANY → viajes con `trip.userId = currentUser.id`.
+  - DRIVER → viajes cuya oferta aceptada (`Bid.status = ACCEPTED`) pertenece al usuario.
+  - ADMIN → viajes con `trip.userId = currentUser.id` (para auditar a otros usuarios está el listado admin).
+- `mine=false` (u omitido) SHALL comportarse exactamente como el contrato base.
+- `mine` SHALL combinarse en AND con `status`, `cargoType`, `minPrice`, `maxPrice` y paginación.
+- La UI expone el filtro como toggle "Mis viajes" en `TripsPage`.

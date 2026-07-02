@@ -273,3 +273,16 @@ When auction closes:
 - [ ] Invalid bid amounts (too high, too low) return `400`
 - [ ] Bids after auction close return `410 Gone`
 - [ ] Manual close: company can close auction early
+
+---
+
+## Wave 1 Delta — UI por tipo de subasta (DUTCH / SEALED)
+
+Sincronizado desde `openspec/changes/wave1-missing-pages-and-validation/specs/auction-type-ui/spec.md`. Cambio de presentación: el backend no se modifica.
+
+- `AuctionCard` SHALL mostrar el badge de tipo ("Abierta" / "Holandesa" / "Cerrada") y, para DUTCH abierta, la etiqueta "↓ Precio baja en vivo".
+- `BidForm` SHALL ramificar por `auction.type`:
+  - OPEN: monto + aclaración + camión + "Realizar oferta" (comportamiento base).
+  - DUTCH: solo botón "¡Tomar!" con confirmación "Vas a aceptar el precio actual de <monto>. ¿Confirmás?"; envía `amount = currentPrice`.
+  - SEALED: mensaje "Oferta sellada — tu propuesta es privada"; NO muestra el mejor precio actual.
+- `BidList` SHALL redactar como "Oferta sellada" los montos ajenos al viewer en subastas SEALED (dueño del viaje y autor de cada oferta ven el monto real) e incluir el aviso de que la redacción definitiva del lado del servidor llega en una próxima versión.

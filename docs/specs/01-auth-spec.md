@@ -226,3 +226,15 @@
 - [ ] All protected endpoints reject requests without valid Bearer token
 - [ ] JWT access token payload contains `userId` and `role`
 - [ ] Token expiry is enforced (access: 15min, refresh: 7d)
+
+---
+
+## Wave 1 Delta — Perfil: avatar, documentación y CUIT
+
+Sincronizado desde `openspec/changes/wave1-missing-pages-and-validation/specs/{profile,user-avatar-upload,driver-document-upload,cuit-validation}/spec.md`.
+
+- `GET /users/me` SHALL incluir `avatarUrl: string | null` y `documentsUrl: string[]`.
+- `POST /users/me/avatar` (multipart `avatar`, jpg/png/webp, ≤ 2 MB) SHALL guardar en `uploads/avatars/<userId>.<ext>` y actualizar `User.avatarUrl`; 413 si excede el tamaño, 400 si el tipo no está permitido.
+- `POST /users/me/documents` (DRIVER/ADMIN, multipart `documents`, pdf/jpg/png, ≤ 5 MB c/u) SHALL guardar en `uploads/documents/<userId>/` y anexar a `User.documentsUrl` sin duplicados; 403 para COMPANY.
+- `express.static('/uploads')` SHALL servir los archivos con cache de 7 días.
+- El CUIT SHALL validarse en el frontend con el algoritmo mod-11 de AFIP (multiplicadores 5,4,3,2,7,6,5,4,3,2; casos especiales 11→0 y 10→9) en `RegisterPage` paso 2 y `ProfilePage` al guardar; con CUIT inválido NO se envía el request y se muestra el error en español.
