@@ -2,12 +2,19 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.notificationService = void 0;
 const prisma_js_1 = require("../models/prisma.js");
+const emailService_js_1 = require("./emailService.js");
+const index_js_1 = require("../websocket/index.js");
 exports.notificationService = {
-    async sendEmail(to, subject, _emailBody) {
-        // Stub for V1 — use console.log
-        // TODO: integrate with SendGrid or AWS SES
-        console.log(`[EMAIL] To: ${to}, Subject: ${subject}`);
-        return { sent: true };
+    async createInApp(userId, type, title, body, payload) {
+        const notification = await prisma_js_1.prisma.notification.create({
+            data: { userId, type, title, body, payload },
+        });
+        // Push en tiempo real al canal personal del usuario
+        (0, index_js_1.broadcastToUser)(userId, { type: 'notification', notification });
+        return notification;
+    },
+    async sendEmail(to, subject, emailBody) {
+        return emailService_js_1.emailService.send(to, subject, `<p>${emailBody}</p>`);
     },
     async notifyAuctionClosed(auctionId, winnerId) {
         // Fetch auction with trip and company

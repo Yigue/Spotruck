@@ -1,9 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.auctionService = void 0;
+const client_1 = require("@prisma/client");
 const prisma_js_1 = require("../models/prisma.js");
 const index_js_1 = require("../config/index.js");
 const errors_js_1 = require("../utils/errors.js");
+const paymentService_js_1 = require("./paymentService.js");
+const notificationService_js_1 = require("./notificationService.js");
+const index_js_2 = require("../websocket/index.js");
 exports.auctionService = {
     async startAuction(tripId) {
         const trip = await prisma_js_1.prisma.trip.findUnique({ where: { id: tripId } });
@@ -24,26 +28,34 @@ exports.auctionService = {
         return auction;
     },
     async closeAuction(auctionId) {
+        // Lock optimista: evita la adjudicación simultánea con la aceptación
+        // manual de la empresa (o un cierre doble del cron)
+        const locked = await prisma_js_1.prisma.auction.updateMany({
+            where: { id: auctionId, status: 'OPEN' },
+            data: { status: 'SETTLED' },
+        });
+        if (locked.count === 0)
+            throw errors_js_1.errors.badRequest('Auction is not OPEN');
         const auction = await prisma_js_1.prisma.auction.findUnique({
             where: { id: auctionId },
             include: { trip: true, bids: { orderBy: { amount: 'asc' } } },
         });
         if (!auction)
             throw errors_js_1.errors.notFound('Auction');
-        if (auction.status !== 'OPEN')
-            throw errors_js_1.errors.badRequest('Auction is not OPEN');
         let winnerId = null;
         let winningAmount = null;
+        let winningBidId = null;
         if (auction.type === 'OPEN' || auction.type === 'SEALED') {
             // Reverse auction: lowest price wins. SEALED also uses lowest.
             const winningBid = auction.bids[0]; // sorted ASC, lowest first
             if (winningBid) {
-                if (auction.reservePrice && winningBid.amount > auction.reservePrice) {
+                if (auction.reservePrice && new client_1.Prisma.Decimal(winningBid.amount).gt(auction.reservePrice)) {
                     // Reserve not met - no winner
                 }
                 else {
                     winnerId = winningBid.userId;
                     winningAmount = winningBid.amount;
+                    winningBidId = winningBid.id;
                 }
             }
         }
@@ -53,27 +65,44 @@ exports.auctionService = {
             if (winningBid) {
                 winnerId = winningBid.userId;
                 winningAmount = winningBid.amount;
+                winningBidId = winningBid.id;
             }
         }
+        if (winningBidId) {
+            await prisma_js_1.prisma.$transaction([
+                prisma_js_1.prisma.bid.update({ where: { id: winningBidId }, data: { status: 'ACCEPTED' } }),
+                prisma_js_1.prisma.bid.updateMany({
+                    where: { auctionId, id: { not: winningBidId }, status: 'PENDING' },
+                    data: { status: 'REJECTED' },
+                }),
+            ]);
+        }
         if (winnerId && winningAmount !== null) {
-            // Create payment hold for winner
-            const platformFee = winningAmount * index_js_1.config.payment.platformFeePercent;
-            const netAmount = winningAmount - platformFee;
-            const holdExpiresAt = new Date(Date.now() + index_js_1.config.payment.holdDurationHours * 60 * 60 * 1000);
-            await prisma_js_1.prisma.payment.create({
-                data: {
-                    tripId: auction.tripId,
-                    userId: winnerId,
-                    amount: winningAmount,
-                    platformFee,
-                    netAmount,
-                    status: 'HELD',
-                    holdExpiresAt,
-                },
+            // currentPrice = monto ganador (createHold lo usa para calcular el pago)
+            await prisma_js_1.prisma.auction.update({
+                where: { id: auctionId },
+                data: { currentPrice: winningAmount },
             });
+            // Lógica de pago unificada en paymentService (misma que la aceptación manual)
+            await paymentService_js_1.paymentService.createHold(auction.tripId, winnerId);
             await prisma_js_1.prisma.trip.update({ where: { id: auction.tripId }, data: { status: 'ASSIGNED' } });
         }
-        await prisma_js_1.prisma.auction.update({ where: { id: auctionId }, data: { status: 'SETTLED' } });
+        else {
+            // Venció sin adjudicar (sin ofertas o sin alcanzar la reserva): el viaje
+            // no puede quedar zombie en AUCTION — se cancela y se avisa a la empresa
+            await prisma_js_1.prisma.bid.updateMany({
+                where: { auctionId, status: 'PENDING' },
+                data: { status: 'REJECTED' },
+            });
+            await prisma_js_1.prisma.trip.update({ where: { id: auction.tripId }, data: { status: 'CANCELLED' } });
+            await notificationService_js_1.notificationService.createInApp(auction.trip.userId, 'AUCTION_CLOSED', 'Tu publicación venció sin adjudicar', auction.bids.length === 0
+                ? `${auction.trip.originAddress} → ${auction.trip.destAddress} no recibió ofertas. Podés crear una nueva publicación ajustando el precio o las fechas`
+                : 'Las ofertas no alcanzaron el precio de reserva. Podés volver a publicar el viaje', { tripId: auction.tripId });
+            (0, index_js_2.broadcastToTrip)(auction.tripId, { type: 'trip_update', status: 'CANCELLED' });
+        }
+        (0, index_js_2.broadcastToAuction)(auctionId, { status: 'SETTLED', winnerId, winningAmount });
+        if (winnerId)
+            (0, index_js_2.broadcastToTrip)(auction.tripId, { type: 'trip_update', status: 'ASSIGNED' });
         return { auctionId, winnerId, winningAmount };
     },
     async processBid(auctionId, userId, amount) {
@@ -93,7 +122,7 @@ exports.auctionService = {
             throw errors_js_1.errors.notFound('User');
         if (user.role !== 'DRIVER')
             throw errors_js_1.errors.forbidden('Only drivers can bid');
-        if (amount >= auction.currentPrice) {
+        if (new client_1.Prisma.Decimal(auction.currentPrice).lte(amount)) {
             throw errors_js_1.errors.badRequest(`Bid must be lower than current price ${auction.currentPrice}`);
         }
         // Anti-sniping: extend if time remaining < 5min and extensionCount < maxExtensions

@@ -57,6 +57,8 @@ services:
         condition: service_healthy
     volumes:
       - ./src/backend:/app
+      # Los uploads sobreviven al restart del contenedor (Wave 1)
+      - ./uploads:/app/uploads
       - /app/node_modules
     command: npm run dev
 

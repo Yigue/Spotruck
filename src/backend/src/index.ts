@@ -1,4 +1,5 @@
 import express from 'express'
+import path from 'path'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
@@ -41,6 +42,15 @@ app.use(express.urlencoded({ extended: true }))
 
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
+
+// Archivos subidos (avatares y documentación) — Wave 1, disco local
+app.use(
+  '/uploads',
+  express.static(path.resolve(process.cwd(), 'uploads'), {
+    maxAge: '7d',
+    fallthrough: true,
+  })
+)
 
 // Rate limiting en auth (fuerza bruta de login/register)
 const authLimiter = rateLimit({

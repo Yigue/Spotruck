@@ -4,6 +4,7 @@ import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
 import { notificationService } from '../services/notificationService.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
+import { avatarUpload, documentsUpload } from '../middleware/upload.js'
 
 const router = Router()
 
@@ -79,23 +80,58 @@ router.patch('/:id/verify', authenticate, requireRole('ADMIN'), async (req, res,
   }
 })
 
-// POST /users/me/documents — Subida de documentación (Placeholder para Fase 3)
-router.post('/me/documents', authenticate, async (req, res, next) => {
+// POST /users/me/avatar — sube la foto de perfil (jpg/png/webp, ≤2MB).
+// Un archivo por usuario: <userId>.<ext> bajo uploads/avatars/
+router.post('/me/avatar', authenticate, avatarUpload.single('avatar'), async (req, res, next) => {
   try {
-    // Acá iría la integración con multer + S3
-    // const fileUrl = await storageService.upload(req.file)
-    const fileUrl = 'https://fake-s3-bucket.com/uploads/driver_license_placeholder.jpg'
+    if (!req.file) return next(errors.badRequest('Subí un archivo de imagen'))
 
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`
     const updated = await prisma.user.update({
       where: { id: req.user!.sub },
-      data: { driverLicenseUrl: fileUrl },
-      select: { id: true, driverLicenseUrl: true }
+      data: { avatarUrl },
+      select: { id: true, avatarUrl: true },
     })
     res.json({ data: updated })
   } catch (err) {
     next(err)
   }
 })
+
+// POST /users/me/documents — el transportista sube su documentación de
+// verificación (licencia, cédula, seguro): pdf/jpg/png, ≤5MB c/u
+router.post(
+  '/me/documents',
+  authenticate,
+  requireRole('DRIVER', 'ADMIN'),
+  documentsUpload.array('documents'),
+  async (req, res, next) => {
+    try {
+      const files = (req.files ?? []) as Express.Multer.File[]
+      if (files.length === 0) return next(errors.badRequest('Subí al menos un archivo (PDF, JPG o PNG)'))
+
+      const userId = req.user!.sub
+      const newUrls = files.map((f) => `/uploads/documents/${userId}/${f.filename}`)
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { documentsUrl: true },
+      })
+      if (!user) return next(errors.notFound('User'))
+
+      // Re-subir el mismo archivo lo pisa en disco: sin duplicados en la lista
+      const documentsUrl = Array.from(new Set([...user.documentsUrl, ...newUrls]))
+      const updated = await prisma.user.update({
+        where: { id: userId },
+        data: { documentsUrl },
+        select: { id: true, documentsUrl: true },
+      })
+      res.json({ data: updated })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 router.get('/me', authenticate, async (req, res) => {
   const user = await prisma.user.findUnique({
@@ -105,6 +141,7 @@ router.get('/me', authenticate, async (req, res) => {
       companyCuit: true, phone: true, driverLicense: true,
       vehiclePlate: true, vehicleType: true, vehicleCapacity: true,
       preferredZone: true, emailVerified: true, documentsStatus: true,
+      avatarUrl: true, documentsUrl: true,
       address: true, website: true, sector: true,
       ratingAvg: true, ratingCount: true, tripsCompleted: true,
       trustScore: true, createdAt: true,
@@ -154,7 +191,7 @@ router.get('/:id/profile', authenticate, async (req, res, next) => {
       select: {
         id: true, role: true, companyName: true, companyCuit: true,
         phone: true, address: true, website: true, sector: true,
-        documentsStatus: true,
+        documentsStatus: true, avatarUrl: true,
         ratingAvg: true, ratingCount: true,
         tripsCompleted: true, trustScore: true, createdAt: true,
         trucks: {

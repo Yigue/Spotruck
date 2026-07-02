@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 export declare const auctionService: {
     startAuction(tripId: string): Promise<{
         status: import(".prisma/client").$Enums.AuctionStatus;
@@ -8,21 +9,24 @@ export declare const auctionService: {
         tripId: string;
         startTime: Date;
         endTime: Date;
-        currentPrice: number;
-        reservePrice: number | null;
+        currentPrice: Prisma.Decimal;
+        reservePrice: Prisma.Decimal | null;
         extensionCount: number;
     }>;
     closeAuction(auctionId: string): Promise<{
         auctionId: string;
         winnerId: string | null;
-        winningAmount: number | null;
+        winningAmount: Prisma.Decimal | null;
     }>;
     processBid(auctionId: string, userId: string, amount: number): Promise<{
+        status: import(".prisma/client").$Enums.BidStatus;
         id: string;
         createdAt: Date;
-        userId: string;
-        amount: number;
         auctionId: string;
+        userId: string;
+        note: string | null;
+        amount: Prisma.Decimal;
+        truckId: string | null;
     }>;
     getAuctionStatus(auctionId: string): Promise<{
         timeRemainingMs: number;
@@ -35,18 +39,26 @@ export declare const auctionService: {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            userId: string;
             originAddress: string;
             originLat: number;
             originLng: number;
+            originProvince: string | null;
+            originCity: string | null;
             destAddress: string;
             destLat: number;
             destLng: number;
+            destProvince: string | null;
+            destCity: string | null;
+            distanceKm: number | null;
+            durationMin: number | null;
             cargoType: import(".prisma/client").$Enums.CargoType;
             cargoDesc: string | null;
             weightKg: number | null;
+            volumeDesc: string | null;
             scheduledDate: Date;
-            basePrice: number;
-            userId: string;
+            endDate: Date | null;
+            basePrice: Prisma.Decimal;
         };
         bids: ({
             user: {
@@ -54,11 +66,14 @@ export declare const auctionService: {
                 id: string;
             };
         } & {
+            status: import(".prisma/client").$Enums.BidStatus;
             id: string;
             createdAt: Date;
-            userId: string;
-            amount: number;
             auctionId: string;
+            userId: string;
+            note: string | null;
+            amount: Prisma.Decimal;
+            truckId: string | null;
         })[];
         _count: {
             bids: number;
@@ -71,8 +86,8 @@ export declare const auctionService: {
         tripId: string;
         startTime: Date;
         endTime: Date;
-        currentPrice: number;
-        reservePrice: number | null;
+        currentPrice: Prisma.Decimal;
+        reservePrice: Prisma.Decimal | null;
         extensionCount: number;
     }>;
 };

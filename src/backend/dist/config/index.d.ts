@@ -2,6 +2,8 @@ export declare const config: {
     port: number;
     nodeEnv: string;
     corsOrigin: string;
+    frontendUrl: string;
+    apiUrl: string;
     jwt: {
         secret: string;
         accessExpiresIn: string;
@@ -16,6 +18,10 @@ export declare const config: {
     mercadopago: {
         accessToken: string;
         webhookSecret: string;
+    };
+    email: {
+        resendApiKey: string;
+        from: string;
     };
     auction: {
         antiSnipingWindowMinutes: number;
