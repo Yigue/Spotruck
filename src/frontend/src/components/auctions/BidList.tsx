@@ -17,6 +17,7 @@ export interface BidWithDetails {
     phone?: string
     tripsCompleted?: number
     documentsStatus?: string
+    avatarUrl?: string | null
   }
   truck?: { id: string; plate: string; type: string; capacityKg: number } | null
 }
@@ -25,6 +26,10 @@ interface BidListProps {
   bids: BidWithDetails[]
   canDecide: boolean
   onDecided: () => void
+  // Wave 1: en subastas SEALED se ocultan los montos ajenos al viewer
+  auctionType?: 'OPEN' | 'DUTCH' | 'SEALED'
+  viewerId?: string
+  isOwner?: boolean
 }
 
 const formatPrice = (price: number) =>
@@ -38,8 +43,22 @@ const statusBadge: Record<BidWithDetails['status'], { label: string; variant: 's
 }
 
 // Tabla comparativa de postulantes (vista empresa de la app original)
-export function BidList({ bids, canDecide, onDecided }: BidListProps) {
+export function BidList({
+  bids,
+  canDecide,
+  onDecided,
+  auctionType = 'OPEN',
+  viewerId,
+  isOwner = false,
+}: BidListProps) {
   const [selected, setSelected] = useState<BidWithDetails | null>(null)
+
+  // SEALED: solo el dueño del viaje y el autor de cada oferta ven el monto real
+  const showRealAmount = (bid: BidWithDetails): boolean => {
+    if (auctionType !== 'SEALED') return true
+    if (isOwner) return true
+    return bid.user.id === viewerId
+  }
 
   if (bids.length === 0) {
     return (
@@ -51,6 +70,13 @@ export function BidList({ bids, canDecide, onDecided }: BidListProps) {
 
   return (
     <>
+      {auctionType === 'SEALED' && (
+        <p className="text-xs text-text-muted italic mb-2">
+          Las ofertas de otros transportistas se muestran como "Oferta sellada" en esta pantalla.
+          La Redacción definitiva se aplica del lado del servidor en una próxima versión.
+        </p>
+      )}
+
       {/* Cards apiladas en mobile */}
       <div className="md:hidden space-y-3">
         {bids.map((bid) => {
@@ -74,7 +100,9 @@ export function BidList({ bids, canDecide, onDecided }: BidListProps) {
                 </p>
               </div>
               <div className="text-right shrink-0">
-                <p className="font-mono font-semibold text-accent">{formatPrice(bid.amount)}</p>
+                <p className="font-mono font-semibold text-accent">
+                  {showRealAmount(bid) ? formatPrice(bid.amount) : 'Oferta sellada'}
+                </p>
                 <Badge variant={badge.variant}>{badge.label}</Badge>
               </div>
             </button>
@@ -109,7 +137,7 @@ export function BidList({ bids, canDecide, onDecided }: BidListProps) {
                     )}
                   </td>
                   <td className="py-3 pr-4 font-mono font-semibold text-accent">
-                    {formatPrice(bid.amount)}
+                    {showRealAmount(bid) ? formatPrice(bid.amount) : 'Oferta sellada'}
                   </td>
                   <td className="py-3 pr-4">{bid.truck ? bid.truck.plate : '—'}</td>
                   <td className="py-3 pr-4 text-text-muted">
@@ -137,6 +165,7 @@ export function BidList({ bids, canDecide, onDecided }: BidListProps) {
 
       <BidDetailModal
         bid={selected}
+        showAmount={selected ? showRealAmount(selected) : true}
         canDecide={canDecide}
         onClose={() => setSelected(null)}
         onDecided={() => {

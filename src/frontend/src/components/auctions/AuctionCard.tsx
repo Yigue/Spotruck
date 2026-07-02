@@ -66,6 +66,9 @@ export function AuctionCard({ auction, trip, onClick }: AuctionCardProps) {
           </span>
           <AuctionCountdown endTime={auction.endTime} status={auction.status} />
         </div>
+        {auction.type === 'DUTCH' && auction.status === 'OPEN' && (
+          <p className="text-xs text-accent">↓ Precio baja en vivo</p>
+        )}
 
         {/* Bid count */}
         <div className="text-sm text-secondary-500">

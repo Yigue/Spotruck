@@ -136,7 +136,8 @@ describe('RegisterPage', () => {
     renderRegister()
     completeStep1('COMPANY')
     fireEvent.change(screen.getByLabelText(/razón social/i), { target: { value: 'Acme' } })
-    fireEvent.change(screen.getByLabelText(/cuit/i), { target: { value: '20-12345678-1' } })
+    // CUIT válido según mod-11 de AFIP (2012345678 → dígito verificador 6)
+    fireEvent.change(screen.getByLabelText(/cuit/i), { target: { value: '20123456786' } })
     fireEvent.click(screen.getByRole('button', { name: /registrarse/i }))
 
     await waitFor(() => {
@@ -145,8 +146,24 @@ describe('RegisterPage', () => {
         password: 'Password1',
         role: 'COMPANY',
         companyName: 'Acme',
+        companyCuit: '20-12345678-6',
       }))
     })
+  })
+
+  it('bloquea el registro con CUIT inválido y muestra el error', async () => {
+    renderRegister()
+    completeStep1('COMPANY')
+    fireEvent.change(screen.getByLabelText(/razón social/i), { target: { value: 'Acme' } })
+    fireEvent.change(screen.getByLabelText(/cuit/i), { target: { value: '99-12345678-9' } })
+    fireEvent.click(screen.getByRole('button', { name: /registrarse/i }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('El prefijo del CUIT no es válido para empresas o personas físicas')
+      ).toBeInTheDocument()
+    })
+    expect(api.post).not.toHaveBeenCalled()
   })
 
   it('sets auth and navigates to dashboard on success', async () => {

@@ -9,6 +9,7 @@ import TripDetailPage from './pages/TripDetailPage'
 import NewTripPage from './pages/NewTripPage'
 import AuctionPage from './pages/AuctionPage'
 import ExplorePage from './pages/ExplorePage'
+import MyBidsPage from './pages/MyBidsPage'
 import ProfilePage from './pages/ProfilePage'
 import StatsPage from './pages/StatsPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="auctions" element={<AuctionPage />} />
           <Route path="auctions/:id" element={<AuctionPage />} />
           <Route path="explore" element={<ExplorePage />} />
+          <Route path="my-bids" element={<MyBidsPage />} />
           <Route path="stats" element={<StatsPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>

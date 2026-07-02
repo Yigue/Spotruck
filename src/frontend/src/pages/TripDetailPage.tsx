@@ -428,6 +428,9 @@ export default function TripDetailPage() {
                 bids={trip.auction.bids ?? []}
                 canDecide={trip.auction.status === 'OPEN'}
                 onDecided={refreshTrip}
+                auctionType={trip.auction.type}
+                viewerId={user?.id}
+                isOwner
               />
             </>
           ) : (
@@ -448,6 +451,7 @@ export default function TripDetailPage() {
                   <BidForm
                     auctionId={trip.auction.id}
                     currentPrice={trip.auction.currentPrice}
+                    auctionType={trip.auction.type}
                     cargoWeightKg={trip.weightKg}
                     onBidPlaced={refreshTrip}
                   />
@@ -463,6 +467,8 @@ export default function TripDetailPage() {
                       bids={(trip.auction.bids ?? []).filter((b) => b.user.id === user.id)}
                       canDecide={false}
                       onDecided={refreshTrip}
+                      auctionType={trip.auction.type}
+                      viewerId={user.id}
                     />
                   </div>
                 )}
