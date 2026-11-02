@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: spottruck_dev_pass
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,7 +21,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - '6379:6379'
+      - '6380:6379'
     volumes:
       - redis_data:/data
     healthcheck:
@@ -42,8 +42,8 @@ services:
       DATABASE_URL: postgresql://admin:spottruck_dev_pass@postgres:5432/spottruck
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-prod}
-      CORS_ORIGIN: http://localhost:3000
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      CORS_ORIGIN: http://localhost:3001
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3001}
       API_URL: ${API_URL:-http://localhost:4000}
       # Credenciales privadas: definirlas en un .env junto a este archivo
       MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
@@ -66,7 +66,7 @@ services:
       context: ./src/frontend
       dockerfile: Dockerfile
     ports:
-      - '3000:3000'
+      - '3001:3000'
     environment:
       VITE_API_URL: http://localhost:4000/api/v1
     depends_on:

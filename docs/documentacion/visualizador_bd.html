@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spottruck — Visualizador Gráfico de Base de Datos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #22c55e;
+      --accent-orange: #f97316;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    header {
+      background-color: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .badge {
+      background-color: var(--accent);
+      color: #000;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      background-color: var(--border);
+      color: var(--text);
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
+    button:hover {
+      background-color: #475569;
+    }
+
+    button.primary {
+      background-color: var(--accent);
+      color: #052e16;
+    }
+
+    button.primary:hover {
+      background-color: #16a34a;
+    }
+
+    main {
+      flex: 1;
+      padding: 24px;
+      overflow: auto;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      background-image: radial-gradient(#334155 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    .diagram-container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+      min-width: 900px;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title-group">
+      <span class="badge">Spottruck</span>
+      <div>
+        <h1>Diagrama Entidad-Relación de Base de Datos</h1>
+        <p class="subtitle">PostgreSQL 15+ · Prisma ORM · Estructura Completa de Tablas y Relaciones</p>
+      </div>
+    </div>
+    <div class="controls">
+      <button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+      <button class="primary" onclick="copyMermaid()">📋 Copiar Código Mermaid</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="diagram-container">
+      <pre class="mermaid">
+erDiagram
+    users ||--o{ trips : "publica (COMPANY)"
+    users ||--o{ bids : "oferta (DRIVER)"
+    users ||--o{ trucks : "posee (DRIVER)"
+    users ||--o{ ratings_given : "emite"
+    users ||--o{ ratings_received : "recibe"
+    users ||--o{ payments : "realiza/recibe"
+    users ||--o{ notifications : "recibe"
+
+    trips ||--o| auctions : "posee subasta (1:1)"
+    trips ||--o{ payments : "genera pagos"
+    trips ||--o{ ratings : "recibe calificaciones"
+    trips ||--o{ tracking_logs : "registra GPS"
+
+    auctions ||--o{ bids : "recibe pujas"
+    trucks ||--o{ bids : "asignado a puja"
+
+    users {
+        String id PK
+        String email UK
+        UserRole role
+        String company_name
+        String company_cuit
+        String phone
+        String driver_license
+        DocumentsStatus documents_status
+        Float rating_avg
+        Float trust_score
+    }
+
+    trucks {
+        String id PK
+        String owner_id FK
+        String plate UK
+        TruckType type
+        Float capacity_kg
+        Boolean active
+    }
+
+    trips {
+        String id PK
+        String user_id FK
+        String origin_address
+        String dest_address
+        Float distance_km
+        CargoType cargo_type
+        Float weight_kg
+        DateTime scheduled_date
+        Decimal base_price
+        TripStatus status
+    }
+
+    auctions {
+        String id PK
+        String trip_id FK_UK
+        AuctionType type
+        DateTime start_time
+        DateTime end_time
+        AuctionStatus status
+        Decimal current_price
+    }
+
+    bids {
+        String id PK
+        String auction_id FK
+        String user_id FK
+        String truck_id FK
+        Decimal amount
+        BidStatus status
+    }
+
+    payments {
+        String id PK
+        String trip_id FK
+        String user_id FK
+        Decimal amount
+        Decimal platform_fee
+        Decimal net_amount
+        PaymentStatus status
+    }
+
+    ratings {
+        String id PK
+        String trip_id FK
+        String from_user_id FK
+        String to_user_id FK
+        Float score
+        String comment
+    }
+
+    tracking_logs {
+        String id PK
+        String trip_id FK
+        Float lat
+        Float lng
+        Float speed
+        DateTime recorded_at
+    }
+
+    notifications {
+        String id PK
+        String user_id FK
+        String type
+        String title
+        DateTime created_at
+    }
+      </pre>
+    </div>
+  </main>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#1e293b',
+        primaryColor: '#22c55e',
+        secondaryColor: '#f97316',
+        tertiaryColor: '#334155',
+        primaryTextColor: '#ffffff',
+        lineColor: '#38bdf8'
+      }
+    });
+
+    function copyMermaid() {
+      const code = document.querySelector('.mermaid').innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        alert('¡Código Mermaid copiado al portapapeles!');
+      });
+    }
+  </script>
+</body>
+</html>
