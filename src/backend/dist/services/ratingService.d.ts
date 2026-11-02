@@ -12,13 +12,13 @@ export declare const ratingService: {
         id: string;
         createdAt: Date;
         tripId: string;
+        fromUserId: string;
         toUserId: string;
         score: number;
         punctuality: number | null;
         communication: number | null;
         cargoCondition: number | null;
         comment: string | null;
-        fromUserId: string;
     }>;
     getUserRatings(userId: string, page?: number, limit?: number): Promise<{
         data: ({
@@ -37,13 +37,13 @@ export declare const ratingService: {
             id: string;
             createdAt: Date;
             tripId: string;
+            fromUserId: string;
             toUserId: string;
             score: number;
             punctuality: number | null;
             communication: number | null;
             cargoCondition: number | null;
             comment: string | null;
-            fromUserId: string;
         })[];
         meta: {
             total: number;

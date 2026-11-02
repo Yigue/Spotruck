@@ -4,42 +4,10 @@ import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
 import { notificationService } from '../services/notificationService.js'
 import { validateCuit, CUIT_ERROR } from '../utils/cuit.js'
-import { makeUploader, IMG_MIMES, DOC_MIMES } from '../utils/uploads.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
+import { avatarUpload, documentsUpload } from '../middleware/upload.js'
 
 const router = Router()
-
-const avatarUpload = makeUploader('avatars', 2, IMG_MIMES)
-const docUpload = makeUploader('documents', 5, DOC_MIMES)
-
-// POST /users/me/avatar — foto de perfil (jpg/png/webp, máx 2 MB)
-router.post('/me/avatar', authenticate, avatarUpload.single('avatar'), async (req, res, next) => {
-  try {
-    if (!req.file) return next(errors.badRequest('Subí una imagen jpg, png o webp de hasta 2 MB'))
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`
-    await prisma.user.update({ where: { id: req.user!.sub }, data: { avatarUrl } })
-    res.json({ data: { avatarUrl } })
-  } catch (err) {
-    next(err)
-  }
-})
-
-// POST /users/me/documents — documentación del transportista para la
-// verificación (licencia, cédula, seguro; jpg/png/pdf, máx 5 MB)
-router.post('/me/documents', authenticate, requireRole('DRIVER'), docUpload.single('document'), async (req, res, next) => {
-  try {
-    if (!req.file) return next(errors.badRequest('Subí un jpg, png o pdf de hasta 5 MB'))
-    const url = `/uploads/documents/${req.file.filename}`
-    const updated = await prisma.user.update({
-      where: { id: req.user!.sub },
-      data: { documentsUrl: { push: url } },
-      select: { documentsUrl: true },
-    })
-    res.json({ data: updated })
-  } catch (err) {
-    next(err)
-  }
-})
 
 // POST /users/me/request-verification — el transportista pide la revisión
 // de su documentación (licencia + camiones cargados)
@@ -112,6 +80,59 @@ router.patch('/:id/verify', authenticate, requireRole('ADMIN'), async (req, res,
     next(err)
   }
 })
+
+// POST /users/me/avatar — sube la foto de perfil (jpg/png/webp, ≤2MB).
+// Un archivo por usuario: <userId>.<ext> bajo uploads/avatars/
+router.post('/me/avatar', authenticate, avatarUpload.single('avatar'), async (req, res, next) => {
+  try {
+    if (!req.file) return next(errors.badRequest('Subí un archivo de imagen'))
+
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`
+    const updated = await prisma.user.update({
+      where: { id: req.user!.sub },
+      data: { avatarUrl },
+      select: { id: true, avatarUrl: true },
+    })
+    res.json({ data: updated })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /users/me/documents — el transportista sube su documentación de
+// verificación (licencia, cédula, seguro): pdf/jpg/png, ≤5MB c/u
+router.post(
+  '/me/documents',
+  authenticate,
+  requireRole('DRIVER', 'ADMIN'),
+  documentsUpload.array('documents'),
+  async (req, res, next) => {
+    try {
+      const files = (req.files ?? []) as Express.Multer.File[]
+      if (files.length === 0) return next(errors.badRequest('Subí al menos un archivo (PDF, JPG o PNG)'))
+
+      const userId = req.user!.sub
+      const newUrls = files.map((f) => `/uploads/documents/${userId}/${f.filename}`)
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { documentsUrl: true },
+      })
+      if (!user) return next(errors.notFound('User'))
+
+      // Re-subir el mismo archivo lo pisa en disco: sin duplicados en la lista
+      const documentsUrl = Array.from(new Set([...user.documentsUrl, ...newUrls]))
+      const updated = await prisma.user.update({
+        where: { id: userId },
+        data: { documentsUrl },
+        select: { id: true, documentsUrl: true },
+      })
+      res.json({ data: updated })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 router.get('/me', authenticate, async (req, res) => {
   const user = await prisma.user.findUnique({

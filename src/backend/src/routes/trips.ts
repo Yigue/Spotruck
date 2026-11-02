@@ -52,16 +52,25 @@ const tripWhereSchema = z.object({
   lat: z.string().optional(),
   lng: z.string().optional(),
   radius: z.string().optional(),
-  mine: z.string().optional(),
   page: z.string().optional(),
   limit: z.string().optional(),
+  // Wave 1: mine=true limita la lista a los viajes propios (empresa: creados;
+  // transportista: asignados vía oferta aceptada). Se combina en AND con el resto.
+  mine: z.enum(['true', 'false']).optional(),
 })
 
 // GET /trips
 router.get('/', authenticate, async (req, res, next) => {
   try {
-    const { status, cargoType, minPrice, maxPrice, lat, lng, radius, page = '1', limit = '20' } = tripWhereSchema.parse(req.query)
+    const { status, cargoType, minPrice, maxPrice, lat, lng, radius, page = '1', limit = '20', mine } = tripWhereSchema.parse(req.query)
     const where: Record<string, any> = {}
+    if (mine === 'true') {
+      if (req.user!.role === 'DRIVER') {
+        where.auction = { is: { bids: { some: { userId: req.user!.sub, status: 'ACCEPTED' } } } }
+      } else {
+        where.userId = req.user!.sub
+      }
+    }
     if (status) where.status = status
     if (cargoType) where.cargoType = cargoType
     if (minPrice || maxPrice) {
@@ -117,7 +126,7 @@ router.get('/:id', authenticate, async (req, res, next) => {
               orderBy: { createdAt: 'desc' },
               take: 10,
               include: {
-                user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, phone: true, tripsCompleted: true, documentsStatus: true } },
+                user: { select: { id: true, companyName: true, ratingAvg: true, ratingCount: true, phone: true, tripsCompleted: true, documentsStatus: true, avatarUrl: true } },
                 truck: { select: { id: true, plate: true, type: true, capacityKg: true } },
               },
             },

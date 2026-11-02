@@ -18,6 +18,7 @@ interface Truck {
 interface BidFormProps {
   auctionId: string
   currentPrice: number
+  // Wave 1: la UI se ramifica según el tipo de subasta (OPEN | DUTCH | SEALED)
   auctionType?: 'OPEN' | 'DUTCH' | 'SEALED'
   cargoWeightKg?: number
   onBidPlaced?: () => void
@@ -40,10 +41,8 @@ export function BidForm({ auctionId, currentPrice, auctionType = 'OPEN', cargoWe
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [confirmDutch, setConfirmDutch] = useState(false)
+  const [dutchConfirm, setDutchConfirm] = useState(false)
 
-  const isDutch = auctionType === 'DUTCH'
-  const isSealed = auctionType === 'SEALED'
   const maxAllowedBid = Math.floor(currentPrice * (1 - MIN_BID_DECREMENT))
 
   useEffect(() => {
@@ -57,22 +56,26 @@ export function BidForm({ auctionId, currentPrice, auctionType = 'OPEN', cargoWe
       .catch(() => {})
   }, [])
 
-  // DUTCH: "¡Tomar!" acepta el precio actual al instante
-  const takeDutch = async () => {
-    setConfirmDutch(false)
+  const placeBid = async (bidAmount: number, bidNote?: string) => {
     setLoading(true)
     try {
       await api.post(`/auctions/${auctionId}/bid`, {
-        amount: currentPrice,
+        amount: bidAmount,
+        note: bidNote?.trim() || undefined,
         truckId: truckId || undefined,
       })
-      toast.success('¡Tomaste el viaje!')
+      toast.success(auctionType === 'DUTCH' ? '¡Tomaste el viaje al precio actual!' : '¡Te postulaste al viaje!')
+      setAmount('')
+      setNote('')
       onBidPlaced?.()
+      return true
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'No se pudo tomar el viaje'
+          ?.message || 'No se pudo realizar la oferta'
       toast.error(message)
+      setError(message)
+      return false
     } finally {
       setLoading(false)
     }
@@ -88,32 +91,14 @@ export function BidForm({ auctionId, currentPrice, auctionType = 'OPEN', cargoWe
       return
     }
 
-    // SEALED no compite contra el precio actual (puja privada); OPEN sí
-    if (!isSealed && bidAmount > maxAllowedBid) {
+    // En SEALED no se muestra el precio actual, así que la regla del 10%
+    // la valida solo el servidor; en OPEN se anticipa el error al usuario
+    if (auctionType === 'OPEN' && bidAmount > maxAllowedBid) {
       setError(`La oferta debe ser de ${formatPrice(maxAllowedBid)} o menos (10% bajo el precio actual)`)
       return
     }
 
-    setLoading(true)
-    try {
-      await api.post(`/auctions/${auctionId}/bid`, {
-        amount: bidAmount,
-        note: note.trim() || undefined,
-        truckId: truckId || undefined,
-      })
-      toast.success('¡Te postulaste al viaje!')
-      setAmount('')
-      setNote('')
-      onBidPlaced?.()
-    } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'No se pudo realizar la oferta'
-      toast.error(message)
-      setError(message)
-    } finally {
-      setLoading(false)
-    }
+    await placeBid(bidAmount, note)
   }
 
   const truckOptions = trucks.map((t) => ({
@@ -123,58 +108,76 @@ export function BidForm({ auctionId, currentPrice, auctionType = 'OPEN', cargoWe
     }`,
   }))
 
-  const truckSelector =
-    trucks.length > 0 ? (
-      <Select
-        label="Camión a elegir"
-        options={truckOptions}
-        value={truckId}
-        onChange={(e) => setTruckId(e.target.value)}
-      />
-    ) : (
-      <p className="text-xs text-text-muted">
-        No tenés camiones cargados.{' '}
-        <Link to="/profile" className="text-primary font-medium">
-          Agregá tu flota en el perfil
-        </Link>{' '}
-        para postularte con un camión.
-      </p>
-    )
+  const noTrucksHint = (
+    <p className="text-xs text-text-muted">
+      No tenés camiones cargados.{' '}
+      <Link to="/profile" className="text-primary font-medium">
+        Agregá tu flota en el perfil
+      </Link>{' '}
+      para postularte con un camión.
+    </p>
+  )
 
-  // ─── DUTCH: solo botón "¡Tomar!" ───────────────────────────────────────────
-  if (isDutch) {
+  // DUTCH: sin campos — un único botón "¡Tomar!" que acepta el precio actual.
+  // El precio es autoritativo del servidor y se refresca por WebSocket
+  // (la página re-fetchea el viaje en cada auction_update).
+  if (auctionType === 'DUTCH') {
     return (
       <div className="space-y-4">
         <div className="text-sm text-secondary-500">
           Precio actual:{' '}
-          <span className="font-mono text-accent font-bold text-lg">{formatPrice(currentPrice)}</span>
-          <span className="block text-xs mt-0.5 text-warning">⏬ El precio baja con el tiempo — tomalo cuando te convenga</span>
+          <span className="font-mono text-accent font-semibold">{formatPrice(currentPrice)}</span>
+          <span className="block text-xs mt-0.5 text-accent">
+            ↓ Subasta holandesa: el primero que toma el precio se lleva el viaje
+          </span>
         </div>
-        {truckSelector}
-        <Button variant="accent" loading={loading} className="w-full" onClick={() => setConfirmDutch(true)}>
-          ¡Tomar a {formatPrice(currentPrice)}!
+
+        {trucks.length > 0 ? (
+          <Select
+            label="Camión a elegir"
+            options={truckOptions}
+            value={truckId}
+            onChange={(e) => setTruckId(e.target.value)}
+          />
+        ) : (
+          noTrucksHint
+        )}
+
+        {error && <p className="text-xs text-error">{error}</p>}
+
+        <Button
+          type="button"
+          variant="accent"
+          loading={loading}
+          className="w-full"
+          onClick={() => setDutchConfirm(true)}
+        >
+          ¡Tomar!
         </Button>
 
         <ConfirmDialog
-          open={confirmDutch}
-          title="Tomar el viaje"
-          description={`Vas a aceptar el precio actual de ${formatPrice(currentPrice)}. ¿Confirmás? Gana el primero que toma.`}
+          open={dutchConfirm}
+          title="¿Tomar el viaje?"
+          description={`Vas a aceptar el precio actual de ${formatPrice(currentPrice)}. ¿Confirmás?`}
           confirmLabel="Sí, tomar"
-          onConfirm={takeDutch}
-          onCancel={() => setConfirmDutch(false)}
+          loading={loading}
+          onConfirm={async () => {
+            const ok = await placeBid(currentPrice)
+            if (ok) setDutchConfirm(false)
+          }}
+          onCancel={() => setDutchConfirm(false)}
         />
       </div>
     )
   }
 
-  // ─── OPEN / SEALED ─────────────────────────────────────────────────────────
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {isSealed ? (
-        <div className="text-sm bg-background rounded p-3">
-          🔒 <span className="font-medium">Oferta sellada</span> — tu propuesta es privada. No
-          ves las ofertas de los demás ni ellos la tuya.
-        </div>
+      {auctionType === 'SEALED' ? (
+        // SEALED: no se muestra el mejor precio actual — la propuesta es privada
+        <p className="text-xs text-text-muted">
+          🔒 Oferta sellada — tu propuesta es privada
+        </p>
       ) : (
         <div className="text-sm text-secondary-500">
           Precio actual: <span className="font-mono text-accent font-semibold">{formatPrice(currentPrice)}</span>
@@ -184,7 +187,16 @@ export function BidForm({ auctionId, currentPrice, auctionType = 'OPEN', cargoWe
         </div>
       )}
 
-      {truckSelector}
+      {trucks.length > 0 ? (
+        <Select
+          label="Camión a elegir"
+          options={truckOptions}
+          value={truckId}
+          onChange={(e) => setTruckId(e.target.value)}
+        />
+      ) : (
+        noTrucksHint
+      )}
 
       <Input
         type="number"

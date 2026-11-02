@@ -2,23 +2,28 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
+import { useAuthStore } from '../hooks/useAuthStore'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
+import { Spinner } from '../components/ui/Spinner'
 import { EmptyState } from '../components/ui/EmptyState'
-import { SkeletonCard } from '../components/ui/Skeleton'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
-import { tripStatusLabels, cargoLabels } from '../utils/labels'
+
+// "Mis Postulaciones" de la app original (Vista/Camionero/misPostulaciones.html),
+// modernizada: filtros por estado + retiro de ofertas pendientes.
 
 interface MyBid {
   id: string
   amount: number
-  note?: string | null
+  note: string | null
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN'
   createdAt: string
-  truck?: { plate: string; type: string } | null
   auction: {
+    id: string
+    type: 'OPEN' | 'DUTCH' | 'SEALED'
     status: string
+    currentPrice: number
     trip: {
       id: string
       originAddress: string
@@ -26,107 +31,190 @@ interface MyBid {
       scheduledDate: string
       status: string
       cargoType: string
+      basePrice: number
     }
   }
+  truck: { id: string; plate: string; type: string } | null
 }
 
-const bidBadge: Record<MyBid['status'], { label: string; variant: 'success' | 'error' | 'info' | 'warning' }> = {
+const statusFilters: { value: string; label: string }[] = [
+  { value: '', label: 'Todas' },
+  { value: 'PENDING', label: 'Pendientes' },
+  { value: 'ACCEPTED', label: 'Aceptadas' },
+  { value: 'REJECTED', label: 'Rechazadas' },
+  { value: 'WITHDRAWN', label: 'Retiradas' },
+]
+
+const statusBadge: Record<MyBid['status'], { label: string; variant: 'success' | 'error' | 'info' | 'warning' }> = {
   PENDING: { label: 'Pendiente', variant: 'info' },
   ACCEPTED: { label: 'Aceptada', variant: 'success' },
   REJECTED: { label: 'Rechazada', variant: 'error' },
   WITHDRAWN: { label: 'Retirada', variant: 'warning' },
 }
 
-const formatPrice = (n: number) =>
-  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(n)
+const formatPrice = (price: number) =>
+  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(price)
 
-// "Mis Postulaciones" del legacy (JS/Camionero/misPostulaciones.js),
-// modernizada: lista de ofertas propias con estado y retiro de pendientes
 export default function MyBidsPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [bids, setBids] = useState<MyBid[]>([])
   const [loading, setLoading] = useState(true)
-  const [withdrawId, setWithdrawId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState('')
+  const [withdrawTarget, setWithdrawTarget] = useState<MyBid | null>(null)
+  const [withdrawing, setWithdrawing] = useState(false)
 
-  const load = useCallback(() => {
-    api
-      .get('/bids/me', { params: { limit: 50 } })
-      .then(({ data }) => setBids(data.data))
-      .catch(() => toast.error('No se pudieron cargar tus postulaciones'))
-      .finally(() => setLoading(false))
-  }, [])
+  const fetchBids = useCallback(async () => {
+    // El endpoint es solo para transportistas: sin rol DRIVER no se consulta
+    if (user?.role !== 'DRIVER') return
+    setLoading(true)
+    setError(null)
+    try {
+      const params: Record<string, string | number> = { page: 1, limit: 50 }
+      if (statusFilter) params.status = statusFilter
+      const { data } = await api.get('/bids/me', { params })
+      setBids(data.data ?? [])
+    } catch {
+      setError('Error al cargar tus postulaciones')
+    } finally {
+      setLoading(false)
+    }
+  }, [statusFilter, user?.role])
 
-  useEffect(load, [load])
+  useEffect(() => {
+    fetchBids()
+  }, [fetchBids])
 
   const handleWithdraw = async () => {
-    if (!withdrawId) return
+    if (!withdrawTarget) return
+    setWithdrawing(true)
     try {
-      await api.patch(`/bids/${withdrawId}/withdraw`)
+      await api.patch(`/bids/${withdrawTarget.id}/withdraw`)
+      // Actualización optimista de la fila; el refetch trae el estado canónico
+      setBids((prev) =>
+        prev.map((b) => (b.id === withdrawTarget.id ? { ...b, status: 'WITHDRAWN' } : b))
+      )
       toast.success('Oferta retirada')
-      setWithdrawId(null)
-      load()
+      setWithdrawTarget(null)
     } catch (err: unknown) {
-      toast.error(
+      const message =
         (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
           ?.message || 'No se pudo retirar la oferta'
-      )
+      toast.error(message)
+      setWithdrawTarget(null)
+      // El estado local puede haber quedado viejo: se refetchea el canónico
+      fetchBids()
+    } finally {
+      setWithdrawing(false)
     }
   }
 
-  if (loading) {
+  if (user?.role !== 'DRIVER') {
     return (
-      <div className="space-y-4">
-        <SkeletonCard />
-        <SkeletonCard />
-      </div>
+      <EmptyState
+        icon="🚫"
+        title="Acceso denegado"
+        description="Esta sección es solo para transportistas"
+        action={{ label: 'Ir al dashboard', onClick: () => navigate('/dashboard') }}
+      />
     )
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Mis postulaciones</h1>
-        <p className="text-text-muted text-sm">{bids.length} ofertas realizadas</p>
+    <div>
+      <h1 className="text-2xl font-bold mb-6">Mis ofertas</h1>
+
+      {/* Filtro por estado */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {statusFilters.map((f) => (
+          <button
+            key={f.value}
+            onClick={() => setStatusFilter(f.value)}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              statusFilter === f.value
+                ? 'bg-primary text-white'
+                : 'bg-surface text-text-muted hover:bg-primary/10'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
-      {bids.length === 0 ? (
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Spinner />
+        </div>
+      )}
+
+      {error && !loading && (
         <EmptyState
-          icon="🔨"
-          title="Todavía no te postulaste a ningún viaje"
-          description="Explorá las publicaciones disponibles y hacé tu primera oferta"
-          action={{ label: 'Explorar viajes', onClick: () => navigate('/explore') }}
+          icon="❌"
+          title="Error al cargar"
+          description={error}
+          action={{ label: 'Reintentar', onClick: fetchBids }}
         />
-      ) : (
+      )}
+
+      {!loading && !error && bids.length === 0 && (
+        <EmptyState
+          icon="📋"
+          title="Aún no te postulaste a ningún viaje"
+          description={
+            statusFilter
+              ? 'No hay postulaciones con este estado'
+              : 'Explorá los viajes disponibles y hacé tu primera oferta'
+          }
+          action={{ label: 'Explorar viajes', onClick: () => navigate('/trips') }}
+        />
+      )}
+
+      {!loading && !error && bids.length > 0 && (
         <div className="space-y-3">
           {bids.map((bid) => {
-            const badge = bidBadge[bid.status]
-            const trip = bid.auction.trip
+            const badge = statusBadge[bid.status]
             const canWithdraw = bid.status === 'PENDING' && bid.auction.status === 'OPEN'
             return (
-              <Card key={bid.id} className="flex flex-col md:flex-row md:items-center gap-3">
-                <button
-                  className="flex-1 text-left min-w-0"
-                  onClick={() => navigate(`/trips/${trip.id}`)}
-                >
-                  <p className="font-medium truncate">
-                    {trip.originAddress} → {trip.destAddress}
-                  </p>
-                  <p className="text-xs text-text-muted">
-                    {cargoLabels[trip.cargoType] ?? trip.cargoType} · Salida{' '}
-                    {new Date(trip.scheduledDate).toLocaleDateString('es-AR')} · Viaje:{' '}
-                    {tripStatusLabels[trip.status] ?? trip.status}
-                    {bid.truck && ` · 🚛 ${bid.truck.plate}`}
-                  </p>
-                  {bid.note && <p className="text-xs text-text-muted italic mt-1">"{bid.note}"</p>}
-                </button>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="font-mono font-semibold text-accent">{formatPrice(bid.amount)}</span>
-                  <Badge variant={badge.variant}>{badge.label}</Badge>
-                  {canWithdraw && (
-                    <Button size="sm" variant="danger" onClick={() => setWithdrawId(bid.id)}>
-                      Retirar
-                    </Button>
-                  )}
+              <Card key={bid.id}>
+                <div className="flex flex-col md:flex-row md:items-center gap-3">
+                  <button
+                    className="flex-1 text-left min-w-0"
+                    onClick={() => navigate(`/trips/${bid.auction.trip.id}`)}
+                  >
+                    <p className="font-medium truncate">
+                      {bid.auction.trip.originAddress}{' '}
+                      <span className="text-text-muted">→</span>{' '}
+                      {bid.auction.trip.destAddress}
+                    </p>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      Salida:{' '}
+                      {new Date(bid.auction.trip.scheduledDate).toLocaleDateString('es-AR')}
+                      {bid.truck && ` · Camión ${bid.truck.plate}`}
+                      {' · Postulado el '}
+                      {new Date(bid.createdAt).toLocaleDateString('es-AR')}
+                    </p>
+                    {bid.note && (
+                      <p className="text-xs text-text-muted mt-0.5 italic truncate">
+                        “{bid.note}”
+                      </p>
+                    )}
+                  </button>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-mono font-semibold text-accent">
+                      {formatPrice(bid.amount)}
+                    </span>
+                    <Badge variant={badge.variant}>{badge.label}</Badge>
+                    {canWithdraw && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => setWithdrawTarget(bid)}
+                      >
+                        Retirar oferta
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </Card>
             )
@@ -135,12 +223,15 @@ export default function MyBidsPage() {
       )}
 
       <ConfirmDialog
-        open={!!withdrawId}
-        title="¿Retirar tu oferta?"
-        description="La empresa ya no podrá aceptarla"
+        open={!!withdrawTarget}
+        title="¿Retirar esta oferta?"
+        description={`Vas a retirar tu oferta de ${
+          withdrawTarget ? formatPrice(withdrawTarget.amount) : ''
+        }. La empresa dejará de verla entre los postulantes.`}
         confirmLabel="Sí, retirar"
+        loading={withdrawing}
         onConfirm={handleWithdraw}
-        onCancel={() => setWithdrawId(null)}
+        onCancel={() => setWithdrawTarget(null)}
       />
     </div>
   )

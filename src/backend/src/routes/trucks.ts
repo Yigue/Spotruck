@@ -1,13 +1,13 @@
 import { Router } from 'express'
+import type { Request, Response, NextFunction } from 'express'
 import { z } from 'zod'
 import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
-import { makeUploader, DOC_MIMES } from '../utils/uploads.js'
+import { truckDocumentsUpload } from '../middleware/upload.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
 
 const router = Router()
 
-const truckDocUpload = makeUploader('truck-documents', 5, DOC_MIMES)
 
 const truckSchema = z.object({
   plate: z.string().min(6).max(10),
@@ -58,27 +58,45 @@ router.post('/', authenticate, requireRole('DRIVER'), async (req, res, next) => 
   }
 })
 
-// POST /trucks/:id/documents — documentación del camión (cédula, seguro,
-// Senasa; jpg/png/pdf, máx 5 MB)
-router.post('/:id/documents', authenticate, requireRole('DRIVER', 'ADMIN'), truckDocUpload.single('document'), async (req, res, next) => {
+// Verifica formato de ID y dueño ANTES de que multer escriba en disco: así nadie
+// sube archivos a la carpeta de un camión ajeno ni abusa del id como path.
+async function authorizeTruckUpload(req: Request, _res: Response, next: NextFunction) {
   try {
-    const truck = await prisma.truck.findUnique({ where: { id: req.params.id as string } })
+    const id = req.params.id as string
+    if (!z.string().uuid().safeParse(id).success) return next(errors.badRequest('Invalid truck id'))
+    const truck = await prisma.truck.findUnique({ where: { id } })
     if (!truck) return next(errors.notFound('Truck'))
-    if (truck.ownerId !== req.user!.sub && req.user!.role !== 'ADMIN') {
-      return next(errors.forbidden())
-    }
-    if (!req.file) return next(errors.badRequest('Subí un jpg, png o pdf de hasta 5 MB'))
-
-    const url = `/uploads/truck-documents/${req.file.filename}`
-    const updated = await prisma.truck.update({
-      where: { id: truck.id },
-      data: { documentsUrl: { push: url } },
-    })
-    res.json({ data: updated })
+    if (truck.ownerId !== req.user!.sub && req.user!.role !== 'ADMIN') return next(errors.forbidden())
+    next()
   } catch (err) {
     next(err)
   }
-})
+}
+
+// POST /trucks/:id/documents — documentación del camión (cédula, seguro,
+// Senasa; jpg/png/pdf, máx 5 MB)
+router.post(
+  '/:id/documents',
+  authenticate,
+  requireRole('DRIVER', 'ADMIN'),
+  authorizeTruckUpload,
+  truckDocumentsUpload.single('document'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) return next(errors.badRequest('Subí un jpg, png o pdf de hasta 5 MB'))
+
+      const id = req.params.id as string
+      const url = `/uploads/documents/trucks/${id}/${req.file.filename}`
+      const truck = await prisma.truck.findUnique({ where: { id }, select: { documentsUrl: true } })
+      // Re-subir el mismo archivo lo pisa en disco: sin duplicados en la lista
+      const documentsUrl = Array.from(new Set([...(truck?.documentsUrl ?? []), url]))
+      const updated = await prisma.truck.update({ where: { id }, data: { documentsUrl } })
+      res.json({ data: updated })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 // PUT /trucks/:id
 router.put('/:id', authenticate, requireRole('DRIVER', 'ADMIN'), async (req, res, next) => {

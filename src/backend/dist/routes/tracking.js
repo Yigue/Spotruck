@@ -5,6 +5,7 @@ const express_1 = require("express");
 const zod_1 = require("zod");
 const prisma_js_1 = require("../models/prisma.js");
 const errors_js_1 = require("../utils/errors.js");
+const index_js_1 = require("../websocket/index.js");
 const auth_js_1 = require("../middleware/auth.js");
 const router = (0, express_1.Router)();
 exports.trackingRouter = router;
@@ -53,6 +54,16 @@ router.post('/:tripId', auth_js_1.authenticate, async (req, res, next) => {
         if (!['ASSIGNED', 'IN_PROGRESS'].includes(trip.status)) {
             return next(errors_js_1.errors.badRequest('Trip not in progress'));
         }
+        // Solo el transportista asignado (oferta aceptada) puede reportar posición
+        if (req.user.role !== 'ADMIN') {
+            const acceptedBid = await prisma_js_1.prisma.bid.findFirst({
+                where: { auction: { tripId: trip.id }, status: 'ACCEPTED' },
+                select: { userId: true },
+            });
+            if (acceptedBid?.userId !== req.user.sub) {
+                return next(errors_js_1.errors.forbidden('You are not assigned to this trip'));
+            }
+        }
         const log = await prisma_js_1.prisma.trackingLog.create({
             data: {
                 tripId: req.params.tripId,
@@ -66,6 +77,14 @@ router.post('/:tripId', auth_js_1.authenticate, async (req, res, next) => {
         if (trip.status === 'ASSIGNED') {
             await prisma_js_1.prisma.trip.update({ where: { id: req.params.tripId }, data: { status: 'IN_PROGRESS' } });
         }
+        (0, index_js_1.broadcastToTrip)(trip.id, {
+            type: 'tracking_update',
+            lat,
+            lng,
+            speed,
+            heading,
+            recordedAt: log.recordedAt.toISOString(),
+        });
         res.status(201).json({ data: log });
     }
     catch (err) {

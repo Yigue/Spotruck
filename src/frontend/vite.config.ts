@@ -21,6 +21,11 @@ export default defineConfig({
         target: 'ws://localhost:4000',
         ws: true,
       },
+      // Avatares y documentos servidos por express.static del backend
+      '/uploads': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
     },
   },
   test: {

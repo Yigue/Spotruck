@@ -71,6 +71,9 @@ export function AuctionCard({ auction, trip, onClick }: AuctionCardProps) {
           </div>
           <AuctionCountdown endTime={auction.endTime} status={auction.status} />
         </div>
+        {auction.type === 'DUTCH' && auction.status === 'OPEN' && (
+          <p className="text-xs text-accent">↓ Precio baja en vivo</p>
+        )}
 
         {/* Bid count — en SEALED no se revela cuántos compiten */}
         {auction.type !== 'SEALED' && (

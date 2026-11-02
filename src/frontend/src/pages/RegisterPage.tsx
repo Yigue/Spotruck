@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { useAuthStore } from '../hooks/useAuthStore'
-import { validateCuit, CUIT_ERROR } from '../utils/cuit'
+import { validateCuit } from '../utils/cuit'
 
 const passwordRules = [
   { label: 'Mínimo 8 caracteres', test: (p: string) => p.length >= 8 },
@@ -27,6 +27,7 @@ export default function RegisterPage() {
   })
   const [terms, setTerms] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [cuitError, setCuitError] = useState('')
   const navigate = useNavigate()
   const setAuth = useAuthStore((s) => s.setAuth)
 
@@ -54,10 +55,18 @@ export default function RegisterPage() {
   }
 
   const register = async (skipDetails: boolean) => {
-    if (!skipDetails && form.companyCuit && !validateCuit(form.companyCuit)) {
-      toast.error(CUIT_ERROR)
-      return
+    // Paridad con la app original: CUIT validado con el mod-11 de AFIP
+    let normalizedCuit = form.companyCuit
+    if (!skipDetails && form.role === 'COMPANY' && form.companyCuit) {
+      const result = validateCuit(form.companyCuit)
+      if (!result.ok) {
+        setCuitError(result.error)
+        toast.error(result.error)
+        return
+      }
+      normalizedCuit = result.formatted
     }
+    setCuitError('')
     setLoading(true)
     try {
       const payload: Record<string, string> = {
@@ -67,7 +76,7 @@ export default function RegisterPage() {
       }
       if (!skipDetails) {
         if (form.companyName) payload.companyName = form.companyName
-        if (form.companyCuit) payload.companyCuit = form.companyCuit
+        if (normalizedCuit) payload.companyCuit = normalizedCuit
         if (form.phone) payload.phone = form.phone
         if (form.driverLicense) payload.driverLicense = form.driverLicense
       }
@@ -180,7 +189,8 @@ export default function RegisterPage() {
                 </div>
                 <div>
                   <label htmlFor="reg-cuit" className="label">CUIT</label>
-                  <input id="reg-cuit" name="companyCuit" className="input" value={form.companyCuit} onChange={handleChange} />
+                  <input id="reg-cuit" name="companyCuit" className="input" value={form.companyCuit} onChange={handleChange} placeholder="XX-XXXXXXXX-X" />
+                  {cuitError && <p className="text-xs text-error mt-1">{cuitError}</p>}
                 </div>
                 <div>
                   <label htmlFor="reg-address" className="label">Ubicación</label>

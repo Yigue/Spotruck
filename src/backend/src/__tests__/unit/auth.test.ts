@@ -1,37 +1,11 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals'
 
 // ─── Mocks — must be before any module imports that use them ───────────────
-jest.mock('@prisma/client', () => ({
-  PrismaClient: jest.fn().mockImplementation(() => ({
-    user: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-    trip: {
-      findUnique: jest.fn(), count: jest.fn(),
-      findMany: jest.fn(), create: jest.fn(),
-      update: jest.fn(), delete: jest.fn(),
-    },
-    auction: {
-      findUnique: jest.fn(), count: jest.fn(),
-      findMany: jest.fn(), create: jest.fn(), update: jest.fn(),
-    },
-    bid: { create: jest.fn(), findMany: jest.fn() },
-    payment: { create: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
-    rating: { create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(), aggregate: jest.fn() },
-  })),
-}))
+jest.mock('@prisma/client', () => require('./prismaClientMock'))
 
 jest.mock('bcryptjs')
 jest.mock('jsonwebtoken')
-jest.mock('../../config/index.js', () => ({
-  config: {
-    jwt: { secret: 'test-secret', accessExpiresIn: '15m', refreshExpiresIn: '7d' },
-    db: { url: 'postgresql://test' },
-    redis: { url: 'redis://localhost' },
-  },
-}))
+jest.mock('../../config/index.js', () => require('./configMock'))
 
 // ─── Now import modules under test ─────────────────────────────────────────
 import { authRouter } from '../../routes/auth.js'

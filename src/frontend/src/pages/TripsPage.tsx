@@ -7,6 +7,7 @@ import { Card } from '../components/ui/Card'
 import { Select } from '../components/ui/Select'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
+import { useAuthStore } from '../hooks/useAuthStore'
 import api from '../utils/api'
 
 interface Trip {
@@ -50,8 +51,10 @@ const cargoTypeOptions = [
 
 export default function TripsPage() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const auctionId = searchParams.get('auction') ?? ''
+  // Wave 1: "Mis viajes" — empresa: creados por mí; transportista: asignados a mí
   const [trips, setTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -75,12 +78,12 @@ export default function TripsPage() {
       setError(null)
 
       try {
-        const params: Record<string, string | number> = {
+        const params: Record<string, string | number | boolean> = {
           page: pagination.page,
           limit: pagination.limit,
         }
 
-        if (mineOnly) params.mine = 'true'
+        if (mineOnly) params.mine = true
         if (statusFilter) params.status = statusFilter
         if (cargoTypeFilter) params.cargoType = cargoTypeFilter
         if (minPrice) params.minPrice = parseFloat(minPrice)
@@ -88,11 +91,14 @@ export default function TripsPage() {
 
         const { data } = await api.get('/trips', { params })
         setTrips(data.data || [])
-        if (data.pagination) {
+        // El backend responde { data, meta: { total, page, limit } }
+        if (data.meta) {
+          const total = data.meta.total || 0
+          const limit = Number(data.meta.limit) || pagination.limit
           setPagination((prev) => ({
             ...prev,
-            total: data.pagination.total || 0,
-            totalPages: data.pagination.totalPages || 0,
+            total,
+            totalPages: Math.ceil(total / limit),
           }))
         }
       } catch {
@@ -103,13 +109,14 @@ export default function TripsPage() {
     }
 
     fetchTrips()
-  }, [pagination.page, mineOnly, statusFilter, cargoTypeFilter, minPrice, maxPrice])
+  }, [pagination.page, pagination.limit, mineOnly, statusFilter, cargoTypeFilter, minPrice, maxPrice])
 
   const handlePageChange = (newPage: number) => {
     setPagination((prev) => ({ ...prev, page: newPage }))
   }
 
   const clearFilters = () => {
+    setMineOnly(false)
     setStatusFilter('')
     setCargoTypeFilter('')
     setMinPrice('')
@@ -117,7 +124,7 @@ export default function TripsPage() {
     setPagination((prev) => ({ ...prev, page: 1 }))
   }
 
-  const hasActiveFilters = statusFilter || cargoTypeFilter || minPrice || maxPrice
+  const hasActiveFilters = mineOnly || statusFilter || cargoTypeFilter || minPrice || maxPrice
 
   const matchedTrip = useMemo(
     () => (auctionId ? trips.find((t) => t.auction?.id === auctionId) ?? null : null),
@@ -139,25 +146,6 @@ export default function TripsPage() {
         </Button>
       </div>
 
-      {/* Pestañas: todos / mis viajes (SDD wave1) */}
-      <div className="flex gap-2 mb-4">
-        {[
-          { mine: false, label: 'Todos' },
-          { mine: true, label: 'Mis viajes' },
-        ].map((tab) => (
-          <button
-            key={tab.label}
-            onClick={() => setMineOnly(tab.mine)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              mineOnly === tab.mine
-                ? 'bg-primary text-white'
-                : 'bg-surface border border-secondary-500/20 text-text-muted hover:border-primary'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
 
       {auctionId && (
         <div
@@ -184,6 +172,26 @@ export default function TripsPage() {
       {/* Filter bar */}
       <Card className="mb-6">
         <div className="flex flex-wrap gap-4 items-end">
+          <button
+            type="button"
+            data-testid="mine-toggle"
+            onClick={() => {
+              setMineOnly((v) => !v)
+              setPagination((prev) => ({ ...prev, page: 1 }))
+            }}
+            className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+              mineOnly
+                ? 'bg-primary text-white border-primary'
+                : 'bg-surface text-text-muted border-secondary-500/30 hover:border-primary/50'
+            }`}
+            title={
+              user?.role === 'DRIVER'
+                ? 'Solo los viajes que te fueron asignados'
+                : 'Solo los viajes que publicaste'
+            }
+          >
+            {mineOnly ? '✓ ' : ''}Mis viajes
+          </button>
           <Select
             label="Estado"
             options={statusOptions}

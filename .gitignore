@@ -1,5 +1,6 @@
 node_modules/
 .env
-
-# Archivos subidos por usuarios (avatares, documentos)
-src/backend/uploads/
+# Archivos subidos por usuarios (avatares y documentos) — viven fuera del repo
+uploads/
+# Artefactos de build (los Dockerfiles compilan desde fuente)
+dist/

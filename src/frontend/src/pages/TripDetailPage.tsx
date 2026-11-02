@@ -428,6 +428,9 @@ export default function TripDetailPage() {
                 bids={trip.auction.bids ?? []}
                 canDecide={trip.auction.status === 'OPEN'}
                 onDecided={refreshTrip}
+                auctionType={trip.auction.type}
+                viewerId={user?.id}
+                isOwner
               />
             </>
           ) : (
@@ -455,13 +458,6 @@ export default function TripDetailPage() {
                 </div>
               )}
 
-              {/* Subasta sellada: las ofertas ajenas son privadas */}
-              {trip.auction.type === 'SEALED' && (
-                <p className="mt-4 text-xs text-text-muted bg-background rounded p-3">
-                  🔒 Subasta sellada: tu propuesta es privada y no podés ver las de los demás.
-                </p>
-              )}
-
               {/* Mis ofertas en esta subasta */}
               {user?.role === 'DRIVER' &&
                 (trip.auction.bids ?? []).some((b) => b.user.id === user.id) && (
@@ -471,6 +467,8 @@ export default function TripDetailPage() {
                       bids={(trip.auction.bids ?? []).filter((b) => b.user.id === user.id)}
                       canDecide={false}
                       onDecided={refreshTrip}
+                      auctionType={trip.auction.type}
+                      viewerId={user.id}
                     />
                   </div>
                 )}

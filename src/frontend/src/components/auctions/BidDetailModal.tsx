@@ -11,6 +11,8 @@ import type { BidWithDetails } from './BidList'
 interface BidDetailModalProps {
   bid: BidWithDetails | null
   canDecide: boolean
+  // Wave 1: en SEALED el monto se oculta a quien no es dueño ni autor
+  showAmount?: boolean
   onClose: () => void
   onDecided: () => void
 }
@@ -31,7 +33,7 @@ const Stars = ({ avg, count }: { avg: number; count: number }) => (
 
 // Modal de detalle del postulante (app original): perfil del transportista,
 // camión, precio propuesto, aclaración y botones ACEPTAR / RECHAZAR
-export function BidDetailModal({ bid, canDecide, onClose, onDecided }: BidDetailModalProps) {
+export function BidDetailModal({ bid, canDecide, showAmount = true, onClose, onDecided }: BidDetailModalProps) {
   const [confirm, setConfirm] = useState<'accept' | 'reject' | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -57,7 +59,7 @@ export function BidDetailModal({ bid, canDecide, onClose, onDecided }: BidDetail
       <Modal open={!!bid} onClose={onClose}>
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <Avatar name={bid.user.companyName} size="lg" />
+            <Avatar name={bid.user.companyName} src={bid.user.avatarUrl ?? undefined} size="lg" />
             <div className="flex-1">
               <p className="font-bold">
                 {bid.user.companyName || 'Transportista'}
@@ -105,7 +107,9 @@ export function BidDetailModal({ bid, canDecide, onClose, onDecided }: BidDetail
             )}
             <div className="flex justify-between py-2">
               <span className="text-text-muted">Precio propuesto</span>
-              <span className="font-mono font-semibold text-accent">{bid.amount == null ? 'Oferta sellada' : formatPrice(bid.amount)}</span>
+              <span className="font-mono font-semibold text-accent">
+                {showAmount && bid.amount != null ? formatPrice(bid.amount) : 'Oferta sellada'}
+              </span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-text-muted">Día de postulación</span>

@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.runAuctionCron = runAuctionCron;
+exports.startAuctionCron = startAuctionCron;
 const prisma_js_1 = require("../models/prisma.js");
 const auctionService_js_1 = require("../services/auctionService.js");
-// setInterval type is inferred correctly
 async function runAuctionCron() {
     const now = new Date();
     const expiredAuctions = await prisma_js_1.prisma.auction.findMany({
@@ -24,8 +24,11 @@ async function runAuctionCron() {
         }
     }
 }
-// Run every 60 seconds
-setInterval(runAuctionCron, 60 * 1000);
-// Run immediately on start
-runAuctionCron().catch(console.error);
+// El cron debe iniciarse explícitamente desde index.ts (antes el archivo se
+// auto-iniciaba al importarse, pero nadie lo importaba y nunca corría)
+function startAuctionCron() {
+    setInterval(runAuctionCron, 60 * 1000);
+    runAuctionCron().catch(console.error);
+    console.log('[CRON] Auction close job started (every 60s)');
+}
 //# sourceMappingURL=auctionCron.js.map

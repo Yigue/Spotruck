@@ -1,4 +1,5 @@
 import express from 'express'
+import path from 'path'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
@@ -43,6 +44,15 @@ app.use(express.urlencoded({ extended: true }))
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
+// Archivos subidos (avatares y documentación) — Wave 1, disco local
+app.use(
+  '/uploads',
+  express.static(path.resolve(process.cwd(), 'uploads'), {
+    maxAge: '7d',
+    fallthrough: true,
+  })
+)
+
 // Rate limiting en auth (fuerza bruta de login/register)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -70,14 +80,16 @@ app.use((_, res) => res.status(404).json({ error: 'Not found' }))
 // Error handler
 app.use(errorHandler)
 
-// WebSocket server
-const wss = setupWebSocket(server)
-;(global as unknown as { wss?: typeof wss }).wss = wss
+// WebSocket + servidor HTTP + crons: solo en ejecución real. En tests
+// (NODE_ENV=test) se importa únicamente `app`, sin puertos ni timers abiertos.
+if (config.nodeEnv !== 'test') {
+  const wss = setupWebSocket(server)
+  ;(global as unknown as { wss?: typeof wss }).wss = wss
 
-// Start server
-server.listen(config.port, () => {
-  console.log(`Server running on port ${config.port}`)
-  startAuctionCron()
-})
+  server.listen(config.port, () => {
+    console.log(`Server running on port ${config.port}`)
+    startAuctionCron()
+  })
+}
 
-export { app }
+export { app, server }

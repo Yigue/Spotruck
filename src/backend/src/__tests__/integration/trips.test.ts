@@ -1,6 +1,7 @@
 import request from 'supertest'
 import { app } from '../../index'
 import { prisma } from '../../models/prisma'
+import { cleanupTestUsers } from './cleanup'
 
 const API = '/api/v1'
 
@@ -48,13 +49,7 @@ describe('Trips CRUD Flow', () => {
   })
 
   afterAll(async () => {
-    // Delete trips first to avoid FK constraint violations
-    await prisma.trip.deleteMany({
-      where: { user: { email: { contains: '_test.com' } } },
-    })
-    await prisma.user.deleteMany({
-      where: { email: { contains: '_test.com' } },
-    })
+    await cleanupTestUsers()
   })
 
   const validTripPayload = {

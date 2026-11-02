@@ -10,7 +10,7 @@ import { Modal } from '../components/ui/Modal'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { Spinner } from '../components/ui/Spinner'
 import { Avatar } from '../components/ui/Avatar'
-import { validateCuit, CUIT_ERROR } from '../utils/cuit'
+import { validateCuit } from '../utils/cuit'
 
 interface Truck {
   id: string
@@ -69,6 +69,13 @@ export default function ProfilePage() {
   const [me, setMe] = useState<Me | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
+  const [cuitError, setCuitError] = useState('')
+
+  // Wave 1: subida de avatar y documentación de verificación
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [docFiles, setDocFiles] = useState<FileList | null>(null)
+  const [docsUploading, setDocsUploading] = useState(false)
 
   // Flota
   const [truckModal, setTruckModal] = useState<'new' | Truck | null>(null)
@@ -101,14 +108,23 @@ export default function ProfilePage() {
 
   const handleSave = async (e: FormEvent) => {
     e.preventDefault()
-    if (form.companyCuit && !validateCuit(form.companyCuit)) {
-      toast.error(CUIT_ERROR)
-      return
+    // Paridad con la app original: el CUIT se valida con el mod-11 de AFIP
+    let normalizedForm = form
+    if (me?.role === 'COMPANY' && form.companyCuit) {
+      const result = validateCuit(form.companyCuit)
+      if (!result.ok) {
+        setCuitError(result.error)
+        toast.error(result.error)
+        return
+      }
+      normalizedForm = { ...form, companyCuit: result.formatted }
+      setForm(normalizedForm)
     }
+    setCuitError('')
     setSaving(true)
     try {
       const payload = Object.fromEntries(
-        Object.entries(form).filter(([, v]) => v !== '')
+        Object.entries(normalizedForm).filter(([, v]) => v !== '')
       )
       await api.put('/users/me', payload)
       toast.success('Perfil actualizado')
@@ -182,18 +198,61 @@ export default function ProfilePage() {
     }
   }
 
-  const uploadFile = async (endpoint: string, field: string, file: File, okMsg: string) => {
-    const fd = new FormData()
-    fd.append(field, file)
+  const handleAvatarUpload = async () => {
+    if (!avatarFile) return
+    if (avatarFile.size > 2 * 1024 * 1024) {
+      toast.error('La imagen no puede superar los 2 MB')
+      return
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(avatarFile.type)) {
+      toast.error('Subí una imagen JPG, PNG o WebP')
+      return
+    }
+    setAvatarUploading(true)
     try {
-      await api.post(endpoint, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      toast.success(okMsg)
+      const fd = new FormData()
+      fd.append('avatar', avatarFile)
+      await api.post('/users/me/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      toast.success('Avatar actualizado')
+      setAvatarFile(null)
       loadMe()
     } catch (err: unknown) {
-      toast.error(
+      const message =
         (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'No se pudo subir el archivo'
-      )
+          ?.message || 'No se pudo subir el avatar'
+      toast.error(message)
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
+
+  const handleDocsUpload = async () => {
+    if (!docFiles || docFiles.length === 0) return
+    for (const f of Array.from(docFiles)) {
+      if (f.size > 5 * 1024 * 1024) {
+        toast.error(`${f.name} supera los 5 MB permitidos por archivo`)
+        return
+      }
+      if (!['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) {
+        toast.error(`${f.name}: solo se aceptan PDF, JPG o PNG`)
+        return
+      }
+    }
+    setDocsUploading(true)
+    try {
+      const fd = new FormData()
+      Array.from(docFiles).forEach((f) => fd.append('documents', f))
+      await api.post('/users/me/documents', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      toast.success('Documentación subida')
+      setDocFiles(null)
+      loadMe()
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message || 'No se pudo subir la documentación'
+      toast.error(message)
+    } finally {
+      setDocsUploading(false)
     }
   }
 
@@ -250,22 +309,32 @@ export default function ProfilePage() {
       </div>
 
       <Card>
-        <div className="flex items-center gap-4 mb-6">
+        <h2 className="text-lg font-bold mb-4">Avatar</h2>
+        <div className="flex items-center gap-4 flex-wrap">
           <Avatar name={me.companyName || me.email} src={me.avatarUrl ?? undefined} size="lg" />
-          <label className="text-sm text-primary font-medium cursor-pointer">
-            Cambiar foto
+          <div className="flex-1 min-w-[220px]">
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) uploadFile('/users/me/avatar', 'avatar', f, 'Foto de perfil actualizada')
-              }}
+              aria-label="Elegir imagen de avatar"
+              onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-text-muted file:mr-3 file:rounded file:border-0 file:bg-primary file:text-white file:px-3 file:py-1.5 file:text-sm file:cursor-pointer"
             />
-            <span className="block text-xs text-text-muted font-normal">jpg, png o webp · máx 2 MB</span>
-          </label>
+            <p className="text-xs text-text-muted mt-1">JPG, PNG o WebP de hasta 2 MB</p>
+          </div>
+          <Button
+            size="sm"
+            variant="accent"
+            loading={avatarUploading}
+            disabled={!avatarFile}
+            onClick={handleAvatarUpload}
+          >
+            Subir
+          </Button>
         </div>
+      </Card>
+
+      <Card>
         <h2 className="text-lg font-bold mb-4">Datos</h2>
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -278,7 +347,7 @@ export default function ProfilePage() {
             <Input label="Teléfono (WhatsApp)" name="phone" value={form.phone ?? ''} onChange={handleChange} placeholder="+54 9 ..." />
             {!isDriver && (
               <>
-                <Input label="CUIT" name="companyCuit" value={form.companyCuit ?? ''} onChange={handleChange} />
+                <Input label="CUIT" name="companyCuit" value={form.companyCuit ?? ''} onChange={handleChange} error={cuitError} placeholder="XX-XXXXXXXX-X" />
                 <Input label="Ubicación" name="address" value={form.address ?? ''} onChange={handleChange} />
                 <Input label="Página web" name="website" value={form.website ?? ''} onChange={handleChange} />
                 <Input label="Sector" name="sector" value={form.sector ?? ''} onChange={handleChange} />
@@ -296,6 +365,53 @@ export default function ProfilePage() {
           </Button>
         </form>
       </Card>
+
+      {isDriver && (
+        <Card>
+          <h2 className="text-lg font-bold mb-1">Documentación</h2>
+          <p className="text-sm text-text-muted mb-4">
+            Subí tu licencia, cédula y seguro (PDF, JPG o PNG de hasta 5 MB cada uno)
+          </p>
+
+          {(me.documentsUrl ?? []).length > 0 && (
+            <ul className="mb-4 space-y-1">
+              {(me.documentsUrl ?? []).map((url) => (
+                <li key={url} className="flex items-center gap-2 text-sm">
+                  <span>📄</span>
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary font-medium hover:underline truncate"
+                  >
+                    {url.split('/').pop()}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <input
+              type="file"
+              multiple
+              accept="application/pdf,image/jpeg,image/png"
+              aria-label="Subí tu licencia, cédula y seguro"
+              onChange={(e) => setDocFiles(e.target.files)}
+              className="flex-1 min-w-[220px] text-sm text-text-muted file:mr-3 file:rounded file:border-0 file:bg-primary file:text-white file:px-3 file:py-1.5 file:text-sm file:cursor-pointer"
+            />
+            <Button
+              size="sm"
+              variant="accent"
+              loading={docsUploading}
+              disabled={!docFiles || docFiles.length === 0}
+              onClick={handleDocsUpload}
+            >
+              Subir
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {isDriver && (
         <Card>
@@ -340,43 +456,6 @@ export default function ProfilePage() {
               </Button>
             )}
           </div>
-        </Card>
-      )}
-
-      {isDriver && (
-        <Card>
-          <div className="flex items-center justify-between mb-3 gap-4 flex-wrap">
-            <div>
-              <h2 className="text-lg font-bold">Mi documentación</h2>
-              <p className="text-sm text-text-muted">Licencia, cédula y seguro para la verificación</p>
-            </div>
-            <label className="btn-secondary cursor-pointer text-sm">
-              + Subir documento
-              <input
-                type="file"
-                accept="image/jpeg,image/png,application/pdf"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  if (f) uploadFile('/users/me/documents', 'document', f, 'Documento subido')
-                }}
-              />
-            </label>
-          </div>
-          {(me.documentsUrl ?? []).length === 0 ? (
-            <p className="text-sm text-text-muted">Sin documentos cargados (jpg, png o pdf · máx 5 MB)</p>
-          ) : (
-            <ul className="text-sm space-y-1">
-              {(me.documentsUrl ?? []).map((url, i) => (
-                <li key={url}>
-                  📄{' '}
-                  <a href={url} target="_blank" rel="noreferrer" className="text-primary font-medium">
-                    Documento {i + 1}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
         </Card>
       )}
 
