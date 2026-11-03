@@ -2,12 +2,13 @@ import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../hooks/useAuthStore'
 import { NotificationBell } from './notifications/NotificationBell'
 
-const navItems: { to: string; label: string; icon: string; driverOnly?: boolean }[] = [
+const navItems: { to: string; label: string; icon: string; driverOnly?: boolean; adminOnly?: boolean }[] = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
   { to: '/trips', label: 'Viajes', icon: '🚚' },
   { to: '/auctions', label: 'Subastas', icon: '🔨' },
   { to: '/explore', label: 'Explorar', icon: '🗺️', driverOnly: true },
   { to: '/my-bids', label: 'Mis ofertas', icon: '📋', driverOnly: true },
+  { to: '/admin', label: 'Verificaciones', icon: '🛡️', adminOnly: true },
   { to: '/stats', label: 'Estadísticas', icon: '📈' },
   { to: '/profile', label: 'Mi perfil', icon: '👤' },
 ]
@@ -16,7 +17,8 @@ export default function Layout() {
   const { user, logout } = useAuthStore()
   const location = useLocation()
   const visibleNavItems = navItems.filter(
-    (item) => !item.driverOnly || user?.role === 'DRIVER'
+    (item) =>
+      (!item.driverOnly || user?.role === 'DRIVER') && (!item.adminOnly || user?.role === 'ADMIN')
   )
 
   return (

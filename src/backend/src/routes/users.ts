@@ -213,6 +213,22 @@ router.get('/:id/profile', authenticate, async (req, res, next) => {
   }
 })
 
+// GET /users/verification/summary — contadores de la cola de verificación (ADMIN)
+router.get('/verification/summary', authenticate, requireRole('ADMIN'), async (_req, res, next) => {
+  try {
+    const grouped = await prisma.user.groupBy({
+      by: ['documentsStatus'],
+      where: { role: 'DRIVER' },
+      _count: { _all: true },
+    })
+    const summary = { NONE: 0, PENDING: 0, APPROVED: 0, REJECTED: 0 } as Record<string, number>
+    for (const g of grouped) summary[g.documentsStatus] = g._count._all
+    res.json({ data: summary })
+  } catch (err) {
+    next(err)
+  }
+})
+
 router.get('/', authenticate, requireRole('ADMIN'), async (req, res, next) => {
   try {
     const { page = '1', limit = '20', role, documentsStatus } = z
@@ -229,7 +245,15 @@ router.get('/', authenticate, requireRole('ADMIN'), async (req, res, next) => {
     const skip = (Number(page) - 1) * Number(limit)
     const take = Number(limit)
     const [users, total] = await Promise.all([
-      prisma.user.findMany({ where, skip, take, select: { id: true, email: true, role: true, companyName: true, driverLicense: true, documentsStatus: true, ratingAvg: true, tripsCompleted: true, createdAt: true } }),
+      prisma.user.findMany({ where, skip, take, orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, email: true, role: true, companyName: true, phone: true,
+          driverLicense: true, documentsStatus: true, documentsUrl: true,
+          avatarUrl: true, emailVerified: true,
+          ratingAvg: true, ratingCount: true, tripsCompleted: true, createdAt: true,
+          trucks: { select: { id: true, plate: true, type: true, capacityKg: true, senasaNumber: true, documentsUrl: true } },
+        },
+      }),
       prisma.user.count({ where }),
     ])
     res.json({ data: users, meta: { total, page: Number(page), limit } })

@@ -1,6 +1,6 @@
 // Testeo integral de caminos infelices y edge cases contra el servidor real:
 // validaciones, permisos, transiciones inválidas, dobles acciones y concurrencia.
-import { API as B, sql, closeDb } from './_lib.mjs'
+import { API as B, sql, PNG, closeDb } from './_lib.mjs'
 let passed = 0
 let failed = 0
 const failures = []
@@ -205,6 +205,57 @@ check('token de un solo uso (reuso → 400)', r.status === 400)
 await sql(`UPDATE users SET password_reset_expires = NOW() - INTERVAL '1 minute', password_reset_token='tok-vencido' WHERE email='${resetEmail}'`)
 r = await api('POST', '/auth/reset-password', null, { token: 'tok-vencido', password: 'OtraPass1' })
 check('token vencido → 400', r.status === 400)
+
+// ════════ E9: Documentación privada + panel de verificación ════════
+console.log('\nE9 — Documentos privados y cola de verificación (admin)')
+const ORIGIN = B.replace('/api/v1', '')
+const ADM = await login('admin@spottruck.com')
+const meDr = (await api('GET', '/auth/me', DR2)).body.data
+const upDoc = async (token) => {
+  const fd = new FormData()
+  fd.append('documents', new Blob([PNG], { type: 'image/png' }), 'licencia.png')
+  const res = await fetch(`${B}/users/me/documents`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+  return { status: res.status, body: await res.json() }
+}
+r = await upDoc(DR2)
+check('transportista sube su documento', r.status === 200 && r.body.data.documentsUrl.length > 0)
+const docUrl = `/uploads/documents/${meDr.id}/licencia.png`
+let res0 = await fetch(`${ORIGIN}${docUrl}`)
+check('el documento YA NO es público (/uploads → 404)', res0.status === 404, `(${res0.status})`)
+const fileUrl = `${B}/files/documents/${meDr.id}/licencia.png`
+const get = (u, t) => fetch(u, { headers: t ? { Authorization: `Bearer ${t}` } : {} })
+check('sin token → 401', (await get(fileUrl)).status === 401)
+check('el dueño lo descarga → 200', (await get(fileUrl, DR2)).status === 200)
+check('otro transportista → 403', (await get(fileUrl, DR)).status === 403)
+check('una empresa → 403', (await get(fileUrl, CO)).status === 403)
+check('el admin lo descarga → 200', (await get(fileUrl, ADM)).status === 200)
+const trav = await get(`${B}/files/documents/${meDr.id}/..%2F..%2Favatars%2Fx.png`, DR2)
+check('path traversal en filename → rechazado', trav.status === 400 || trav.status === 404, `(${trav.status})`)
+const trav2 = await get(`${B}/files/documents/..%2F..%2Fetc/passwd`, DR2)
+check('path traversal en ownerId → rechazado', trav2.status >= 400 && trav2.status !== 500, `(${trav2.status})`)
+
+// avatar: sigue siendo público
+const fdAv = new FormData()
+fdAv.append('avatar', new Blob([PNG], { type: 'image/png' }), 'a.png')
+const avRes = await fetch(`${B}/users/me/avatar`, { method: 'POST', headers: { Authorization: `Bearer ${DR2}` }, body: fdAv })
+const avUrl = (await avRes.json()).data?.avatarUrl
+check('el avatar se sube', avRes.status === 200 && !!avUrl)
+check('el avatar es público (carga sin token)', (await fetch(`${ORIGIN}${avUrl}`)).status === 200)
+
+// cola de verificación
+r = await api('POST', '/users/me/request-verification', DR2)
+check('transportista pide la verificación', r.status === 200 && r.body.data.documentsStatus === 'PENDING', JSON.stringify(r.body).slice(0, 80))
+r = await api('GET', '/users/verification/summary', DR2)
+check('un no-admin no ve el resumen → 403', r.status === 403)
+r = await api('GET', '/users/verification/summary', ADM)
+check('el admin ve el resumen con pendientes', r.status === 200 && r.body.data.PENDING >= 1, JSON.stringify(r.body))
+r = await api('GET', '/users?role=DRIVER&documentsStatus=PENDING', ADM)
+const pend = r.body.data?.find((u) => u.id === meDr.id)
+check('la cola incluye documentos y camiones del postulante', !!pend && pend.documentsUrl.length > 0 && Array.isArray(pend.trucks) && pend.trucks.length > 0, JSON.stringify(pend ?? {}).slice(0, 100))
+r = await api('PATCH', `/users/${meDr.id}/verify`, ADM, { action: 'reject', note: 'La licencia está vencida' })
+check('el admin rechaza con una nota', r.status === 200 && r.body.data.documentsStatus === 'REJECTED')
+const notifs2 = (await api('GET', '/notifications', DR2)).body.data
+check('el transportista recibe el motivo del rechazo', notifs2.some((n) => n.type === 'DOCUMENTS_REVIEWED' && /vencida/.test(n.body ?? '')))
 
 console.log(`\n${'═'.repeat(50)}`)
 console.log(`RESULTADO: ${passed} ✓ | ${failed} ✗`)

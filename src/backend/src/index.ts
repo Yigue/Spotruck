@@ -19,6 +19,7 @@ import { trucksRouter } from './routes/trucks.js'
 import { bidsRouter } from './routes/bids.js'
 import { notificationsRouter } from './routes/notifications.js'
 import { statsRouter } from './routes/stats.js'
+import { filesRouter } from './routes/files.js'
 import { setupWebSocket } from './websocket/index.js'
 import { startAuctionCron } from './jobs/auctionCron.js'
 
@@ -38,19 +39,16 @@ app.use(helmet())
 app.use(cors({ origin: config.corsOrigin }))
 app.use(morgan('combined'))
 app.use(express.json())
-app.use('/uploads', express.static('uploads'))
 app.use(express.urlencoded({ extended: true }))
 
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
-// Archivos subidos (avatares y documentación) — Wave 1, disco local
+// Solo los AVATARES son públicos. La documentación (licencias, cédulas, seguros)
+// se sirve por /api/v1/files con autenticación y control de dueño.
 app.use(
-  '/uploads',
-  express.static(path.resolve(process.cwd(), 'uploads'), {
-    maxAge: '7d',
-    fallthrough: true,
-  })
+  '/uploads/avatars',
+  express.static(path.resolve(process.cwd(), 'uploads', 'avatars'), { maxAge: '7d', fallthrough: true })
 )
 
 // Rate limiting en auth (fuerza bruta de login/register)
@@ -73,6 +71,7 @@ app.use('/api/v1/trucks', trucksRouter)
 app.use('/api/v1/bids', bidsRouter)
 app.use('/api/v1/notifications', notificationsRouter)
 app.use('/api/v1/stats', statsRouter)
+app.use('/api/v1/files', filesRouter)
 
 // 404
 app.use((_, res) => res.status(404).json({ error: 'Not found' }))

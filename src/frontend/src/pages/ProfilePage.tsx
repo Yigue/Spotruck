@@ -10,6 +10,7 @@ import { Modal } from '../components/ui/Modal'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { Spinner } from '../components/ui/Spinner'
 import { Avatar } from '../components/ui/Avatar'
+import { ProtectedFileLink } from '../components/ui/ProtectedFileLink'
 import { validateCuit } from '../utils/cuit'
 
 interface Truck {
@@ -378,14 +379,7 @@ export default function ProfilePage() {
               {(me.documentsUrl ?? []).map((url) => (
                 <li key={url} className="flex items-center gap-2 text-sm">
                   <span>📄</span>
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary font-medium hover:underline truncate"
-                  >
-                    {url.split('/').pop()}
-                  </a>
+                  <ProtectedFileLink url={url} className="truncate" />
                 </li>
               ))}
             </ul>

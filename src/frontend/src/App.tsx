@@ -12,6 +12,7 @@ import ExplorePage from './pages/ExplorePage'
 import MyBidsPage from './pages/MyBidsPage'
 import ProfilePage from './pages/ProfilePage'
 import StatsPage from './pages/StatsPage'
+import AdminPage from './pages/AdminPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="explore" element={<ExplorePage />} />
           <Route path="my-bids" element={<MyBidsPage />} />
           <Route path="stats" element={<StatsPage />} />
+          <Route path="admin" element={<AdminPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
