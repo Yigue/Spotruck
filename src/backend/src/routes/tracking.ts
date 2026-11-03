@@ -1,14 +1,31 @@
 import { Router } from 'express'
+import type { Request, Response, NextFunction } from 'express'
 import { z } from 'zod'
 import { prisma } from '../models/prisma.js'
 import { errors } from '../utils/errors.js'
 import { broadcastToTrip } from '../websocket/index.js'
+import { isTripParty } from '../utils/tripAccess.js'
 import { authenticate } from '../middleware/auth.js'
 
 const router = Router()
 
+// Solo las partes del viaje (empresa dueña, transportista asignado) o un admin
+async function requireTripParty(req: Request, _res: Response, next: NextFunction) {
+  try {
+    const trip = await prisma.trip.findUnique({
+      where: { id: req.params.tripId as string },
+      select: { id: true, userId: true },
+    })
+    if (!trip) return next(errors.notFound('Trip'))
+    if (!(await isTripParty(trip, { id: req.user!.sub, role: req.user!.role }))) return next(errors.forbidden())
+    next()
+  } catch (err) {
+    next(err)
+  }
+}
+
 // GET /tracking/:tripId/current — última posición
-router.get('/:tripId/current', authenticate, async (req, res, next) => {
+router.get('/:tripId/current', authenticate, requireTripParty, async (req, res, next) => {
   try {
     const log = await prisma.trackingLog.findFirst({
       where: { tripId: req.params.tripId as string },
@@ -22,7 +39,7 @@ router.get('/:tripId/current', authenticate, async (req, res, next) => {
 })
 
 // GET /tracking/:tripId/history — historial de posiciones
-router.get('/:tripId/history', authenticate, async (req, res, next) => {
+router.get('/:tripId/history', authenticate, requireTripParty, async (req, res, next) => {
   try {
     const { limit = '100' } = req.query
     const logs = await prisma.trackingLog.findMany({

@@ -7,6 +7,7 @@ import { errors } from '../utils/errors.js'
 import { notificationService } from '../services/notificationService.js'
 import { bidService } from '../services/bidService.js'
 import { broadcastToAuction } from '../websocket/index.js'
+import { auctionVisibilityFilter, canViewTrip, sanitizeBidsForViewer } from '../utils/tripAccess.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
 
 const router = Router()
@@ -40,9 +41,12 @@ router.get('/', authenticate, async (req, res, next) => {
     if (status) where.status = status
     if (type) where.type = type
 
+    const visibility = auctionVisibilityFilter({ id: req.user!.sub, role: req.user!.role })
+    const finalWhere = visibility ? { AND: [where, visibility] } : where
+
     const [auctions, total] = await Promise.all([
       prisma.auction.findMany({
-        where,
+        where: finalWhere,
         skip: (Number(page) - 1) * Number(limit),
         take: Number(limit),
         orderBy: { startTime: 'desc' },
@@ -53,7 +57,7 @@ router.get('/', authenticate, async (req, res, next) => {
           _count: { select: { bids: true } },
         },
       }),
-      prisma.auction.count({ where }),
+      prisma.auction.count({ where: finalWhere }),
     ])
 
     res.json({ data: auctions, meta: { total, page: Number(page), limit: Number(limit) } })
@@ -82,16 +86,14 @@ router.get('/:id', authenticate, async (req, res, next) => {
     })
     if (!auction) return next(errors.notFound('Auction'))
 
-    // Teléfonos de postulantes: solo para la empresa dueña del viaje
-    const isOwner = auction.trip.userId === req.user!.sub || req.user!.role === 'ADMIN'
-    const data = isOwner
-      ? auction
-      : {
-          ...auction,
-          bids: auction.bids.map((b) =>
-            b.user.id === req.user!.sub ? b : { ...b, user: { ...b.user, phone: null } }
-          ),
-        }
+    const viewer = { id: req.user!.sub, role: req.user!.role }
+    if (!(await canViewTrip(auction.trip, viewer))) return next(errors.notFound('Auction'))
+
+    const isOwner = auction.trip.userId === viewer.id || viewer.role === 'ADMIN'
+    const data = {
+      ...auction,
+      bids: sanitizeBidsForViewer(auction.bids, viewer.id, isOwner, auction.type === 'SEALED'),
+    }
 
     res.json({ data })
   } catch (err) {
@@ -204,9 +206,12 @@ router.get('/:id/bids', authenticate, async (req, res, next) => {
   try {
     const auction = await prisma.auction.findUnique({
       where: { id: req.params.id as string },
-      select: { trip: { select: { userId: true } } },
+      select: { type: true, trip: { select: { id: true, userId: true, status: true } } },
     })
     if (!auction) return next(errors.notFound('Auction'))
+
+    const viewer = { id: req.user!.sub, role: req.user!.role }
+    if (!(await canViewTrip(auction.trip, viewer))) return next(errors.notFound('Auction'))
 
     const bids = await prisma.bid.findMany({
       where: { auctionId: req.params.id as string },
@@ -217,12 +222,8 @@ router.get('/:id/bids', authenticate, async (req, res, next) => {
       },
     })
 
-    const isOwner = auction.trip.userId === req.user!.sub || req.user!.role === 'ADMIN'
-    const data = isOwner
-      ? bids
-      : bids.map((b) => (b.user.id === req.user!.sub ? b : { ...b, user: { ...b.user, phone: null } }))
-
-    res.json({ data })
+    const isOwner = auction.trip.userId === viewer.id || viewer.role === 'ADMIN'
+    res.json({ data: sanitizeBidsForViewer(bids, viewer.id, isOwner, auction.type === 'SEALED') })
   } catch (err) {
     next(err)
   }

@@ -7,6 +7,7 @@ import { notificationService } from '../services/notificationService.js'
 import { paymentService } from '../services/paymentService.js'
 import { mercadopagoService } from '../services/mercadopagoService.js'
 import { broadcastToTrip } from '../websocket/index.js'
+import { tripVisibilityFilter, canViewTrip, isTripParty, sanitizeBidsForViewer } from '../utils/tripAccess.js'
 import { authenticate, requireRole } from '../middleware/auth.js'
 
 const router = Router()
@@ -93,9 +94,13 @@ router.get('/', authenticate, async (req, res, next) => {
       where.id = { in: ids.map((x) => x.id) }
     }
 
+    // Visibilidad: borradores y viajes ajenos no se exponen (ver utils/tripAccess)
+    const visibility = tripVisibilityFilter({ id: req.user!.sub, role: req.user!.role })
+    const finalWhere = visibility ? { AND: [where, visibility] } : where
+
     const [trips, total] = await Promise.all([
       prisma.trip.findMany({
-        where,
+        where: finalWhere,
         skip: (Number(page) - 1) * Number(limit),
         take: Number(limit),
         orderBy: { createdAt: 'desc' },
@@ -104,7 +109,7 @@ router.get('/', authenticate, async (req, res, next) => {
           auction: { select: { id: true, status: true, currentPrice: true, type: true, endTime: true } },
         },
       }),
-      prisma.trip.count({ where }),
+      prisma.trip.count({ where: finalWhere }),
     ])
 
     res.json({ data: trips, meta: { total, page: Number(page), limit: Number(limit) } })
@@ -138,27 +143,24 @@ router.get('/:id', authenticate, async (req, res, next) => {
     })
     if (!trip) return next(errors.notFound('Trip'))
 
-    // Los teléfonos de los postulantes solo los ve la empresa dueña del viaje.
-    // En subasta SELLADA, además, un transportista no ve los montos ajenos.
-    const isOwner = trip.userId === req.user!.sub || req.user!.role === 'ADMIN'
-    const sealed = trip.auction?.type === 'SEALED'
-    const data =
-      !isOwner && trip.auction
+    // Sin acceso → 404 (no se revela que el viaje existe). Ver utils/tripAccess.
+    const viewer = { id: req.user!.sub, role: req.user!.role }
+    if (!(await canViewTrip(trip, viewer))) return next(errors.notFound('Trip'))
+
+    // Teléfonos de postulantes solo para la empresa dueña; en subasta SELLADA los
+    // montos ajenos no se exponen; el seguimiento GPS solo para las partes.
+    const isOwner = trip.userId === viewer.id || viewer.role === 'ADMIN'
+    const isParty = isOwner || (await isTripParty(trip, viewer))
+    const data = {
+      ...trip,
+      trackingLogs: isParty ? trip.trackingLogs : [],
+      auction: trip.auction
         ? {
-            ...trip,
-            auction: {
-              ...trip.auction,
-              bids: trip.auction.bids.map((b) => {
-                if (b.user.id === req.user!.sub) return b
-                return {
-                  ...b,
-                  user: { ...b.user, phone: null },
-                  ...(sealed ? { amount: null, sealed: true } : {}),
-                }
-              }),
-            },
+            ...trip.auction,
+            bids: sanitizeBidsForViewer(trip.auction.bids, viewer.id, isOwner, trip.auction.type === 'SEALED'),
           }
-        : trip
+        : trip.auction,
+    }
 
     res.json({ data })
   } catch (err) {

@@ -116,7 +116,7 @@ describe('TripsService', () => {
 
         expect.objectContaining({
 
-          where: {},
+          where: { AND: [{}, { userId: 'company-1' }] },
 
           skip: 0,
 
@@ -166,7 +166,7 @@ describe('TripsService', () => {
 
         expect.objectContaining({
 
-          where: expect.objectContaining({ status: 'OPEN', cargoType: 'REFRIGERATED' }),
+          where: { AND: [expect.objectContaining({ status: 'OPEN', cargoType: 'REFRIGERATED' }), { userId: 'company-1' }] },
 
         })
 
@@ -202,11 +202,11 @@ describe('TripsService', () => {
 
         expect.objectContaining({
 
-          where: expect.objectContaining({
+          where: { AND: [expect.objectContaining({
 
             basePrice: expect.objectContaining({ gte: 10000, lte: 50000 }),
 
-          }),
+          }), { userId: 'company-1' }] },
 
         })
 
@@ -242,7 +242,7 @@ describe('TripsService', () => {
 
         expect.objectContaining({
 
-          where: expect.objectContaining({ userId: 'company-1' }),
+          where: { AND: [expect.objectContaining({ userId: 'company-1' }), { userId: 'company-1' }] },
 
         })
 
@@ -278,11 +278,11 @@ describe('TripsService', () => {
 
         expect.objectContaining({
 
-          where: expect.objectContaining({
+          where: { AND: [expect.objectContaining({
 
             auction: { is: { bids: { some: { userId: 'driver-1', status: 'ACCEPTED' } } } },
 
-          }),
+          }), { OR: [{ status: 'AUCTION' }, { auction: { is: { bids: { some: { userId: 'driver-1' } } } } }] }] },
 
         })
 
@@ -316,10 +316,49 @@ describe('TripsService', () => {
 
       expect(mockPrisma.trip.findMany).toHaveBeenCalledWith(
 
-        expect.objectContaining({ where: {} })
+        expect.objectContaining({ where: { AND: [{}, { userId: 'company-1' }] } })
 
       )
 
+    })
+
+
+    it('el transportista solo ve el mercado (en subasta) y los viajes donde ofertó', async () => {
+      mockPrisma.trip.findMany.mockResolvedValue([])
+      mockPrisma.trip.count.mockResolvedValue(0)
+      const req = mockReq({}, {}, {}, { sub: 'driver-1', role: 'DRIVER', email: 'd@x.com' })
+      const res = mockRes()
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
+      await handler(req, res, mockNext())
+      expect(mockPrisma.trip.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { AND: [{}, { OR: [{ status: 'AUCTION' }, { auction: { is: { bids: { some: { userId: 'driver-1' } } } } }] }] },
+        })
+      )
+    })
+
+    it('una empresa no ve los viajes de la competencia (ni sus borradores)', async () => {
+      mockPrisma.trip.findMany.mockResolvedValue([])
+      mockPrisma.trip.count.mockResolvedValue(0)
+      const req = mockReq({}, {}, { status: 'DRAFT' }, { sub: 'company-2', role: 'COMPANY', email: 'c2@x.com' })
+      const res = mockRes()
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
+      await handler(req, res, mockNext())
+      expect(mockPrisma.trip.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { AND: [expect.objectContaining({ status: 'DRAFT' }), { userId: 'company-2' }] },
+        })
+      )
+    })
+
+    it('el admin lista sin restricción de visibilidad', async () => {
+      mockPrisma.trip.findMany.mockResolvedValue([])
+      mockPrisma.trip.count.mockResolvedValue(0)
+      const req = mockReq({}, {}, {}, { sub: 'admin-1', role: 'ADMIN', email: 'a@x.com' })
+      const res = mockRes()
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
+      await handler(req, res, mockNext())
+      expect(mockPrisma.trip.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {} }))
     })
 
   })

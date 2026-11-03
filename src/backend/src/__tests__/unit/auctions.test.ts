@@ -81,7 +81,7 @@ describe('AuctionsService', () => {
 
       expect(mockPrisma.auction.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ status: 'OPEN', type: 'DUTCH' }),
+          where: { AND: [expect.objectContaining({ status: 'OPEN', type: 'DUTCH' }), { trip: { userId: 'company-1' } }] },
         })
       )
     })

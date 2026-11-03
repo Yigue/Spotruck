@@ -257,6 +257,68 @@ check('el admin rechaza con una nota', r.status === 200 && r.body.data.documents
 const notifs2 = (await api('GET', '/notifications', DR2)).body.data
 check('el transportista recibe el motivo del rechazo', notifs2.some((n) => n.type === 'DOCUMENTS_REVIEWED' && /vencida/.test(n.body ?? '')))
 
+// ════════ E10: Privacidad — nadie ve lo que no le corresponde ════════
+console.log('\nE10 — Privacidad entre empresas y transportistas')
+const DR3 = await login('camionero3@demo.com')
+const truck3 = (await api('GET', '/trucks', DR3)).body.data[0]
+const ids = (resp) => (resp.body?.data ?? []).map((t) => t.id)
+
+// borradores
+r = await api('POST', '/trips', CO2, { ...baseTrip, originAddress: 'SECRETO-ORIGEN', draft: true })
+const draftSecret = r.body.data.id
+check('un transportista NO ve borradores ajenos en el listado', !ids(await api('GET', '/trips?status=DRAFT&limit=100', DR)).includes(draftSecret))
+check('una empresa NO ve borradores de la competencia en el listado', !ids(await api('GET', '/trips?status=DRAFT&limit=100', CO)).includes(draftSecret))
+check('abrir un borrador ajeno por id → 404 (transportista)', (await api('GET', `/trips/${draftSecret}`, DR)).status === 404)
+check('abrir un borrador ajeno por id → 404 (otra empresa)', (await api('GET', `/trips/${draftSecret}`, CO)).status === 404)
+check('el dueño sí ve su borrador', (await api('GET', `/trips/${draftSecret}`, CO2)).status === 200)
+check('el admin ve el borrador', (await api('GET', `/trips/${draftSecret}`, ADM)).status === 200)
+
+// mercado: una subasta de la empresa 2
+r = await api('POST', '/trips', CO2, baseTrip)
+const mkTrip = r.body.data.id, mkAuc = r.body.data.auction.id
+check('el transportista ve el viaje en subasta (mercado)', ids(await api('GET', '/trips?status=AUCTION&limit=100', DR)).includes(mkTrip))
+check('otra empresa NO ve la subasta de la competencia', !ids(await api('GET', '/trips?limit=100', CO)).includes(mkTrip))
+check('otra empresa NO abre el detalle de la competencia → 404', (await api('GET', `/trips/${mkTrip}`, CO)).status === 404)
+const aucIds = (await api('GET', '/auctions?limit=100', CO)).body.data.map((a) => a.id)
+check('otra empresa NO ve la subasta en /auctions', !aucIds.includes(mkAuc))
+check('otra empresa NO abre /auctions/:id ajeno → 404', (await api('GET', `/auctions/${mkAuc}`, CO)).status === 404)
+
+// acceso por haber ofertado: se mantiene aunque el viaje se adjudique a otro
+await api('POST', `/auctions/${mkAuc}/bid`, DR, { amount: 26000, truckId })
+const winBid = (await api('POST', `/auctions/${mkAuc}/bid`, DR2, { amount: 22000, truckId: otherTruck.id })).body.data.id
+await api('PATCH', `/bids/${winBid}`, CO2, { action: 'accept' })
+check('quien ofertó sigue viendo el viaje adjudicado a otro (200)', (await api('GET', `/trips/${mkTrip}`, DR)).status === 200)
+check('quien NO ofertó no ve el viaje ya asignado (404)', (await api('GET', `/trips/${mkTrip}`, DR3)).status === 404)
+
+// GPS: solo las partes
+await api('POST', `/trips/${mkTrip}/start`, DR2)
+await api('POST', `/tracking/${mkTrip}`, DR2, { lat: -30.5, lng: -61.2, speed: 70 })
+check('GPS: la empresa dueña lo ve (200)', (await api('GET', `/tracking/${mkTrip}/current`, CO2)).status === 200)
+check('GPS: el transportista asignado lo ve (200)', (await api('GET', `/tracking/${mkTrip}/current`, DR2)).status === 200)
+check('GPS: una empresa competidora NO lo ve (403)', (await api('GET', `/tracking/${mkTrip}/current`, CO)).status === 403)
+check('GPS: un transportista ajeno NO lo ve (403)', (await api('GET', `/tracking/${mkTrip}/current`, DR3)).status === 403)
+check('GPS historial: un ajeno NO lo ve (403)', (await api('GET', `/tracking/${mkTrip}/history`, DR3)).status === 403)
+check('GPS: el admin lo ve (200)', (await api('GET', `/tracking/${mkTrip}/current`, ADM)).status === 200)
+const detParty = (await api('GET', `/trips/${mkTrip}`, DR)).body.data
+check('el detalle NO incluye el recorrido GPS para quien no es parte', (detParty.trackingLogs ?? []).length === 0)
+
+// subasta SELLADA: montos ocultos en TODOS los endpoints
+r = await api('POST', '/trips', CO2, { ...baseTrip, auctionType: 'SEALED' })
+const sTrip10 = r.body.data.id, sAuc10 = r.body.data.auction.id
+await api('POST', `/auctions/${sAuc10}/bid`, DR, { amount: 27000, truckId })
+await api('POST', `/auctions/${sAuc10}/bid`, DR3, { amount: 25000, truckId: truck3.id })
+const peek = async (path, token) => {
+  const x = await api('GET', path, token)
+  const bidsArr = x.body.data?.auction?.bids ?? x.body.data?.bids ?? (Array.isArray(x.body.data) ? x.body.data : [])
+  return bidsArr
+}
+for (const [label, path] of [['GET /trips/:id', `/trips/${sTrip10}`], ['GET /auctions/:id', `/auctions/${sAuc10}`], ['GET /auctions/:id/bids', `/auctions/${sAuc10}/bids`]]) {
+  const seen = await peek(path, DR)
+  const ajenos = seen.filter((b) => b.amount !== 27000)
+  check(`SELLADA ${label}: no expone montos ajenos`, seen.length > 0 && ajenos.length > 0 && ajenos.every((b) => b.amount === null), JSON.stringify(seen.map((b) => b.amount)))
+}
+check('SELLADA: la empresa dueña ve todos los montos', (await peek(`/auctions/${sAuc10}/bids`, CO2)).every((b) => typeof b.amount === 'number'))
+
 console.log(`\n${'═'.repeat(50)}`)
 console.log(`RESULTADO: ${passed} ✓ | ${failed} ✗`)
 if (failures.length) failures.forEach((f) => console.log(` - ${f}`))
