@@ -141,7 +141,7 @@ export default function NewTripPage() {
   useEffect(() => {
     fetchProvinces()
       .then(setProvinces)
-      .catch(() => toast.error('No se pudo cargar el listado de provincias'))
+      .catch(() => toast.error('No se pudo cargar el listado de provincias. Recargá la página para reintentar.', { id: 'provinces-error' }))
   }, [])
 
   // Calcula la ruta (distancia y duración) cuando origen y destino están elegidos

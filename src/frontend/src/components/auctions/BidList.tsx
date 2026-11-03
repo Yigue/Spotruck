@@ -33,6 +33,10 @@ interface BidListProps {
   isOwner?: boolean
 }
 
+// Sin nombre cargado, el postulante se identifica por su camión
+const bidderName = (b: { user: { companyName?: string | null }; truck?: { plate: string } | null }) =>
+  b.user.companyName || (b.truck ? `Transportista · ${b.truck.plate}` : 'Transportista')
+
 const formatPrice = (price: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(price)
 
@@ -91,7 +95,7 @@ export function BidList({
             >
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">
-                  {bid.user.companyName || 'Transportista'}
+                  {bidderName(bid)}
                   {bid.user.ratingAvg > 0 && (
                     <span className="text-warning text-xs ml-2">★ {bid.user.ratingAvg.toFixed(1)}</span>
                   )}
@@ -131,7 +135,7 @@ export function BidList({
               return (
                 <tr key={bid.id} className="border-b border-secondary-500/10">
                   <td className="py-3 pr-4 font-medium">
-                    {bid.user.companyName || 'Transportista'}
+                    {bidderName(bid)}
                     {bid.user.ratingAvg > 0 && (
                       <span className="text-warning text-xs ml-2">
                         ★ {bid.user.ratingAvg.toFixed(1)}

@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Polyline } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 
@@ -32,12 +32,15 @@ const destIcon = L.icon({
 })
 
 export function TripDetailMap({ originLat, originLng, destLat, destLng, originAddress, destAddress }: TripDetailMapProps) {
-  const centerLat = (originLat + destLat) / 2
-  const centerLng = (originLng + destLng) / 2
+  // Encuadra siempre origen y destino, sea cual sea la distancia del viaje
+  const bounds: [[number, number], [number, number]] = [
+    [originLat, originLng],
+    [destLat, destLng],
+  ]
   return (
     <MapContainer
-      center={[centerLat, centerLng]}
-      zoom={6}
+      bounds={bounds}
+      boundsOptions={{ padding: [50, 50] }}
       className="w-full h-full min-h-[400px] rounded-lg"
       scrollWheelZoom={false}
     >
@@ -46,12 +49,23 @@ export function TripDetailMap({ originLat, originLng, destLat, destLng, originAd
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <Marker position={[originLat, originLng]} icon={originIcon}>
-        <div>{originAddress}</div>
+        <Popup>
+          <strong>Origen</strong>
+          <br />
+          {originAddress}
+        </Popup>
       </Marker>
       <Marker position={[destLat, destLng]} icon={destIcon}>
-        <div>{destAddress}</div>
+        <Popup>
+          <strong>Destino</strong>
+          <br />
+          {destAddress}
+        </Popup>
       </Marker>
-      <Polyline positions={[[originLat, originLng], [destLat, destLng]]} color="primary" />
+      <Polyline
+        positions={[[originLat, originLng], [destLat, destLng]]}
+        pathOptions={{ color: '#1B5E20', weight: 3, dashArray: '8 8' }}
+      />
     </MapContainer>
   )
 }

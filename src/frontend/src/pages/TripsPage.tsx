@@ -172,26 +172,25 @@ export default function TripsPage() {
       {/* Filter bar */}
       <Card className="mb-6">
         <div className="flex flex-wrap gap-4 items-end">
-          <button
-            type="button"
-            data-testid="mine-toggle"
-            onClick={() => {
-              setMineOnly((v) => !v)
-              setPagination((prev) => ({ ...prev, page: 1 }))
-            }}
-            className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-              mineOnly
-                ? 'bg-primary text-white border-primary'
-                : 'bg-surface text-text-muted border-secondary-500/30 hover:border-primary/50'
-            }`}
-            title={
-              user?.role === 'DRIVER'
-                ? 'Solo los viajes que te fueron asignados'
-                : 'Solo los viajes que publicaste'
-            }
-          >
-            {mineOnly ? '✓ ' : ''}Mis viajes
-          </button>
+          {/* La empresa ya ve únicamente sus publicaciones: el toggle es del transportista */}
+          {user?.role === 'DRIVER' && (
+            <button
+              type="button"
+              data-testid="mine-toggle"
+              onClick={() => {
+                setMineOnly((v) => !v)
+                setPagination((prev) => ({ ...prev, page: 1 }))
+              }}
+              className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                mineOnly
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-surface text-text-muted border-secondary-500/30 hover:border-primary/50'
+              }`}
+              title="Solo los viajes que te fueron asignados"
+            >
+              {mineOnly ? '✓ ' : ''}Mis viajes
+            </button>
+          )}
           <Select
             label="Estado"
             options={statusOptions}

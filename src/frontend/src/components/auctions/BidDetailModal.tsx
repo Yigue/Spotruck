@@ -17,6 +17,10 @@ interface BidDetailModalProps {
   onDecided: () => void
 }
 
+// Sin nombre cargado, el postulante se identifica por su camión
+const bidderName = (b: { user: { companyName?: string | null }; truck?: { plate: string } | null }) =>
+  b.user.companyName || (b.truck ? `Transportista · ${b.truck.plate}` : 'Transportista')
+
 const formatPrice = (price: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(price)
 
@@ -62,7 +66,7 @@ export function BidDetailModal({ bid, canDecide, showAmount = true, onClose, onD
             <Avatar name={bid.user.companyName} src={bid.user.avatarUrl ?? undefined} size="lg" />
             <div className="flex-1">
               <p className="font-bold">
-                {bid.user.companyName || 'Transportista'}
+                {bidderName(bid)}
                 {bid.user.documentsStatus === 'APPROVED' && (
                   <span className="ml-2 text-xs bg-success/10 text-success px-2 py-0.5 rounded-full align-middle">
                     ✓ Verificado
