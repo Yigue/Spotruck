@@ -1,8 +1,6 @@
 // Verificación end-to-end de los happy paths de Spottruck contra el server real.
 // Usuarios nuevos (no del seed) para validar el funnel completo desde cero.
-import { execSync } from 'child_process'
-
-const B = 'http://localhost:4000/api/v1'
+import { API as B, sql, closeDb } from './_lib.mjs'
 let passed = 0
 let failed = 0
 const failures = []
@@ -32,13 +30,6 @@ async function api(method, path, token, body) {
   return { status: res.status, body: json }
 }
 
-function sql(q) {
-  return execSync(
-    `sudo -u postgres psql -t -A spottruck -c "${q.replace(/"/g, '\\"')}"`,
-    { encoding: 'utf8' }
-  ).trim()
-}
-
 const ts = Date.now()
 const emailCo = `hp-empresa-${ts}@test.com`
 const emailDr = `hp-driver-${ts}@test.com`
@@ -56,7 +47,7 @@ const CO = r.body.data.accessToken
 r = await api('GET', '/auth/me', CO)
 check('emailVerified arranca en false', r.body.data.emailVerified === false)
 
-const vtoken = sql(`SELECT email_verify_token FROM users WHERE email='${emailCo}'`)
+const vtoken = await sql(`SELECT email_verify_token FROM users WHERE email='${emailCo}'`)
 check('token de verificación generado', vtoken.length > 10)
 r = await api('POST', '/auth/verify-email', null, { token: vtoken })
 check('verify-email funciona', r.status === 200 && r.body.data.verified === true)
@@ -84,7 +75,7 @@ check('solicitar verificación (con licencia y camión)', r.status === 200 && r.
 
 let admin = await api('POST', '/auth/login', null, { email: 'admin@spottruck.com', password: 'Demo1234!' })
 const ADM = admin.body.data.accessToken
-const drId = sql(`SELECT id FROM users WHERE email='${emailDr}'`)
+const drId = await sql(`SELECT id FROM users WHERE email='${emailDr}'`)
 r = await api('PATCH', `/users/${drId}/verify`, ADM, { action: 'approve' })
 check('admin aprueba documentación', r.body.data?.documentsStatus === 'APPROVED')
 r = await api('GET', `/users/${drId}/profile`, CO)
@@ -167,17 +158,17 @@ check('empresa ve la posición actual', r.body.data?.lat === -28.0)
 r = await api('POST', `/trips/${tripId}/finish`, DR)
 check('driver termina (DELIVERED, esperando confirmación)', r.body.data?.status === 'DELIVERED')
 
-const completedBefore = Number(sql(`SELECT trips_completed FROM users WHERE id='${drId}'`))
+const completedBefore = Number(await sql(`SELECT trips_completed FROM users WHERE id='${drId}'`))
 r = await api('POST', `/trips/${tripId}/confirm-delivery`, CO)
 check('empresa confirma (SETTLED)', r.body.data?.status === 'SETTLED')
 r = await api('GET', `/payments/${tripId}`, DR)
 check('pago liberado al transportista (RELEASED)', r.body.data.status === 'RELEASED' && r.body.data.netAmount === 40480)
-const completedAfter = Number(sql(`SELECT trips_completed FROM users WHERE id='${drId}'`))
+const completedAfter = Number(await sql(`SELECT trips_completed FROM users WHERE id='${drId}'`))
 check('tripsCompleted del driver +1', completedAfter === completedBefore + 1)
 
 // ════════ HP7: Valoración bidireccional ════════
 console.log('\nHP7 — Valoraciones cruzadas')
-const coId = sql(`SELECT id FROM users WHERE email='${emailCo}'`)
+const coId = await sql(`SELECT id FROM users WHERE email='${emailCo}'`)
 r = await api('POST', '/ratings', CO, { tripId, toUserId: drId, score: 5, punctuality: 5, communication: 5, cargoCondition: 5, comment: 'Muy buen conductor' })
 check('empresa valora al transportista', r.status === 201 || r.status === 200)
 r = await api('POST', '/ratings', DR, { tripId, toUserId: coId, score: 4, punctuality: 4, communication: 5, cargoCondition: 4, comment: 'Todo a tiempo y rápido' })
@@ -204,7 +195,7 @@ const trip2 = r.body.data.id
 const auc2 = r.body.data.auction.id
 await api('POST', `/auctions/${auc2}/bid`, DR, { amount: 17500, truckId })
 // vencer la subasta y esperar a que el CRON REAL del servidor la cierre (corre cada 60s)
-sql(`UPDATE auctions SET end_time = NOW() - INTERVAL '1 minute' WHERE id='${auc2}'`)
+await sql(`UPDATE auctions SET end_time = NOW() - INTERVAL '1 minute' WHERE id='${auc2}'`)
 console.log('  … esperando el ciclo del cron (hasta 75s)')
 for (let i = 0; i < 15; i++) {
   await new Promise((res) => setTimeout(res, 5000))
@@ -223,7 +214,7 @@ r = await api('POST', '/trips', CO, {
 })
 const trip3 = r.body.data.id
 const auc3 = r.body.data.auction.id
-sql(`UPDATE auctions SET end_time = NOW() - INTERVAL '1 minute' WHERE id='${auc3}'`)
+await sql(`UPDATE auctions SET end_time = NOW() - INTERVAL '1 minute' WHERE id='${auc3}'`)
 console.log('  … esperando el ciclo del cron (hasta 75s)')
 for (let i = 0; i < 15; i++) {
   await new Promise((res) => setTimeout(res, 5000))
@@ -240,4 +231,5 @@ if (failures.length) {
   console.log('Fallas:')
   failures.forEach((f) => console.log(` - ${f}`))
 }
+await closeDb()
 process.exit(failed > 0 ? 1 : 0)

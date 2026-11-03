@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 env:
   NODE_VERSION: '20'
@@ -51,6 +51,16 @@ jobs:
 
       - name: Generate Prisma client
         run: npx prisma generate
+
+      - name: Apply migrations (base de test vacía)
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/spottruck_test
+        run: npx prisma migrate deploy
+
+      - name: Check schema drift (migraciones == schema.prisma)
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/spottruck_test
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
 
       - name: Run lint
         run: npm run lint

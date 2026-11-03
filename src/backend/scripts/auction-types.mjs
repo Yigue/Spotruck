@@ -1,14 +1,11 @@
 // Verificación e2e de tipos de subasta DUTCH y SEALED + documentos de camión.
-import { execSync } from 'child_process'
-import fs from 'fs'
-const B = 'http://localhost:4000/api/v1'
+import { API as B, sql, PNG, closeDb } from './_lib.mjs'
 let pass = 0, fail = 0
 const check = (n, c, x='') => { if (c) { pass++; console.log('  ✓', n) } else { fail++; console.log('  ✗', n, x) } }
 async function api(m, p, t, b) {
   const r = await fetch(`${B}${p}`, { method: m, headers: { 'Content-Type':'application/json', ...(t?{Authorization:`Bearer ${t}`}:{}) }, body: b?JSON.stringify(b):undefined })
   let j=null; try{j=await r.json()}catch{}; return { status:r.status, body:j }
 }
-const sql = (q) => execSync(`sudo -u postgres psql -t -A spottruck -c "${q.replace(/"/g,'\\"')}"`,{encoding:'utf8'}).trim()
 const login = async (e)=>(await api('POST','/auth/login',null,{email:e,password:'Demo1234!'})).body.data.accessToken
 
 const CO=await login('empresa@demo.com'), D1=await login('camionero1@demo.com'), D2=await login('camionero2@demo.com')
@@ -24,7 +21,7 @@ const aucId=r.body.data.auction.id
 let det=await api('GET',`/auctions/${aucId}`,D1)
 check('tipo DUTCH y precio inicial = base', det.body.data.type==='DUTCH' && Number(det.body.data.currentPrice)===60000)
 // simular paso del tiempo y disparar tick (cron cada 15s)
-sql(`UPDATE auctions SET start_time = NOW() - INTERVAL '12 hours' WHERE id='${aucId}'`)
+await sql(`UPDATE auctions SET start_time = NOW() - INTERVAL '12 hours' WHERE id='${aucId}'`)
 console.log('  … esperando tick de decremento (16s)')
 await new Promise(s=>setTimeout(s,16000))
 det=await api('GET',`/auctions/${aucId}`,D1)
@@ -50,14 +47,12 @@ check('D1 NO ve montos ajenos', bids.filter(b=>b.amount!==35000).every(b=>b.amou
 check('empresa ve todos los montos', (await api('GET',`/trips/${sTrip}`,CO)).body.data.auction.bids.every(b=>typeof b.amount==='number'))
 
 console.log('\nDocumentos de camión — upload real (multer)')
-execSync(`python3 -c "import zlib,struct
-def c(t,d): x=t+d; return struct.pack('>I',len(d))+x+struct.pack('>I',zlib.crc32(x))
-open('/tmp/td.png','wb').write(b'\\x89PNG\\r\\n\\x1a\\n'+c(b'IHDR',struct.pack('>IIBBBBB',1,1,8,6,0,0,0))+c(b'IDAT',zlib.compress(b'\\x00\\x10\\x80\\x20\\xff'))+c(b'IEND',b''))"`)
 const fd=new FormData()
-fd.append('document', new Blob([fs.readFileSync('/tmp/td.png')],{type:'image/png'}), 'cedula.png')
+fd.append('document', new Blob([PNG],{type:'image/png'}), 'cedula.png')
 const up=await fetch(`${B}/trucks/${t1.id}/documents`,{method:'POST',headers:{Authorization:`Bearer ${D1}`},body:fd})
 const upj=await up.json()
 check('subir documento de camión', up.status===200 && upj.data.documentsUrl?.length>0, JSON.stringify(upj).slice(0,100))
 
 console.log(`\n${'='.repeat(40)}\nRESULTADO: ${pass} ✓ | ${fail} ✗`)
+await closeDb()
 process.exit(fail>0?1:0)
