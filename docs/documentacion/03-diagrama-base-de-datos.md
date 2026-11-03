@@ -115,6 +115,8 @@ Table users {
   password_reset_expires timestamp
   documents_status DocumentsStatus [not null, default: 'NONE']
   driver_license_url varchar
+  avatar_url varchar
+  documents_url text[]
   address varchar
   website varchar
   sector varchar

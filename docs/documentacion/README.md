@@ -70,8 +70,9 @@ Actualmente, **Spottruck** se encuentra en fase **V1.0.0 (Desarrollo Activo e In
   - `Auth`: Flujos completos de Login, Registro, Recupero/Reset de Contraseña y Verificación de Email.
 
 ### 🧪 4. Testing y Calidad
-- **Backend:** Tests unitarios y de integración con Jest y Supertest. Scripts de simulación de flujo completo (`test-flow.py` y `test-api.py`).
-- **Frontend:** Tests de componentes e integración con Vitest, React Testing Library y Playwright.
+- **Backend:** Jest (unitarios + integración con Supertest; `NODE_ENV=test` evita levantar servidor y crons). Scripts end-to-end contra un servidor real en `src/backend/scripts/` (`npm run test:e2e`): `edge-cases.mjs`, `happy-paths.mjs`, `auction-types.mjs`.
+- **Frontend:** Vitest + React Testing Library.
+- **Calidad:** ESLint 9 (flat config) en ambos paquetes y CI en `.github/workflows` (build, lint, tests, verificación de migraciones sin drift y auditoría de seguridad).
 
 ### 🐳 5. Infraestructura y Docker
 - Entorno de ejecución contenedorizado listo vía `docker-compose.yml` integrando servicios de PostgreSQL 15, Redis, Backend API y Frontend Vite.

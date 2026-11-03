@@ -173,3 +173,29 @@ El sistema legacy fue estructurado bajo un patrón MVC tradicional en PHP:
 | **Telemetría GPS y Tracking** | Mapa estático Leaflet/Google Maps sin actualización en tiempo real. | Telemetría GPS en vivo vía **WebSockets (`ws://`)** con historial de coordenadas, velocidad y rumbo. | Monitoreo preciso minuto a minuto de la ubicación del flete durante todo el trayecto. |
 | **Flota y Validación Documental** | Formulario básico de patente y modelo sin verificación documental. | Sistema de homologación de choferes (`DocumentsStatus`), validación SENASA y seguro JSON. | Cumplimiento regulatorio alimenticio y fiscal para transporte de carga pesada en Argentina. |
 | **Calificaciones y Reputación** | Sin sistema de puntuación. | Evaluación bidireccional post-entrega (1-5 estrellas) con desgloses y cálculo nocturno de `trustScore`. | Creación de historial crediticio y reputacional transparente para la comunidad logística. |
+
+---
+
+## 🗺️ 4. Mapa de Pantallas Actuales (Frontend React)
+
+| Ruta | Pantalla | Rol | Qué hace |
+|---|---|---|---|
+| `/login`, `/register` | Login / Registro | Público | Alta con validación de CUIT (dígito verificador) y acceso con JWT. |
+| `/forgot-password`, `/reset-password` | Recupero de contraseña | Público | Envía enlace de reseteo (Resend, o simulado sin credenciales) y fija nueva clave. |
+| `/verify-email` | Verificación de email | Público | Confirma el token recibido por correo. |
+| `/dashboard` | Panel principal | Todos | KPIs por rol (`/stats/me`), lista de viajes relevantes (empresa: sus publicaciones; transportista: sus viajes o los disponibles) y acciones rápidas por rol. |
+| `/trips` | Viajes | Todos | Listado con filtros (estado, carga, precio) y paginación. «Mis viajes» para transportistas. La empresa solo ve lo suyo. |
+| `/trips/new` | Publicar viaje | Empresa | Formulario con mapa, provincias/localidades (Georef), tipo de subasta (`OPEN`/`DUTCH`/`SEALED`) y borrador. |
+| `/trips/:id` | Detalle del viaje | Todos* | Mapa con ruta, subasta en vivo, postulantes (modal con perfil y Aceptar/Rechazar), pago, estado del viaje con stepper, GPS en vivo, calificación y **Cancelar publicación** (dueño, estados `DRAFT/OPEN/AUCTION/ASSIGNED`). *Sujeto a las reglas de visibilidad. |
+| `/auctions`, `/auctions/:id` | Subastas | Todos | Subastas activas con cuenta regresiva y WebSocket. |
+| `/explore` | Explorar en mapa | Transportista | Viajes cercanos con radio de búsqueda. |
+| `/my-bids` | Mis ofertas | Transportista | Historial de postulaciones; editar o retirar mientras estén `PENDING`. |
+| `/stats` | Estadísticas | Todos | Gráficos mensuales de gasto/ingresos y KPIs. |
+| `/profile` | Perfil | Todos | Datos, foto, flota de camiones y documentación (descarga autenticada vía `/files`). |
+| `/admin` | Verificaciones | Admin | Cola de transportistas con documentación pendiente: ver documentos, aprobar o rechazar (`PATCH /users/:id/verify`), contadores por estado. |
+
+### Reglas transversales
+- **Visibilidad:** la empresa ve solo sus viajes; el transportista ve los viajes en subasta y aquellos donde ya ofertó; los borradores nunca son públicos. Lo no visible responde 404.
+- **Subastas `SEALED`:** los montos ajenos llegan redactados desde el backend; la empresa los ve al decidir.
+- **Archivos:** solo los avatares son públicos; documentos se descargan con token.
+- **Dinero:** `Decimal(12,2)` en base y API.

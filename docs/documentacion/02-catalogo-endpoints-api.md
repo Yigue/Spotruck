@@ -12,7 +12,10 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
   Authorization: Bearer <jwt_access_token>
   ```
 - **Control de Acceso (RBAC):** Basado en los roles `COMPANY` (Empresa), `DRIVER` (Transportista) y `ADMIN` (Administrador).
-- **Formato de Respuesta Estándar:** JSON.
+- **Formato de Respuesta Estándar:** JSON. Éxito: `{ "data": ... , "meta"?: { total, page, limit } }`. Error: `{ "error": { "code", "message" } }`.
+- **Montos:** se almacenan como `Decimal(12,2)` y se serializan como número JSON (`450000.5`).
+- **Visibilidad:** las reglas de quién ve qué viaje/subasta/GPS están centralizadas en `src/backend/src/utils/tripAccess.ts`. Un recurso no visible responde 404.
+- **Tiempo real:** WebSocket en `/ws` (canales `auction:<id>`, `trip:<id>`, `user:<id>`; se autentica con el primer mensaje).
 
 ---
 
@@ -29,6 +32,7 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
 9. [Calificaciones y Reseñas (`/ratings`)](#9-calificaciones-y-reseñas-ratings)
 10. [Notificaciones (`/notifications`)](#10-notificaciones-notifications)
 11. [Estadísticas y Métricas (`/stats`)](#11-estadísticas-y-métricas-stats)
+12. [Archivos Privados (`/files`)](#12-archivos-privados-files)
 
 ---
 
@@ -143,11 +147,20 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
 
 ---
 
-### `POST /users/me/documents`
-- **Descripción:** Registra o actualiza la documentación del transportista (licencia, seguro, seguro de vida, etc.).
+### `POST /users/me/avatar`
+- **Descripción:** Sube la foto de perfil (JPG/PNG/WebP, ≤ 2 MB). Un archivo por usuario. Es el **único** archivo servido públicamente (`/uploads/avatars/<userId>.<ext>`).
 - **Autenticación:** Requerida.
-- **Body:** `{ "driverLicenseUrl": "https://...", "documents": [...] }`
-- **Respuesta (200 OK):** Perfil actualizado con `documentsStatus = PENDING`.
+- **Body:** `multipart/form-data` con el campo `avatar`.
+- **Respuesta (200 OK):** `{ id, avatarUrl }`.
+
+---
+
+### `POST /users/me/documents`
+- **Descripción:** El transportista sube su documentación de verificación (licencia, cédula, seguro). Se guarda en `uploads/documents/<userId>/` y el estado de verificación no cambia hasta solicitarla.
+- **Autenticación:** Requerida (`DRIVER` o `ADMIN`).
+- **Body:** `multipart/form-data` con uno o más archivos en el campo `documents` (PDF/JPG/PNG, ≤ 5 MB c/u).
+- **Respuesta (200 OK):** Usuario con `documentsUrl` actualizado (sin duplicados).
+- **Descarga:** los documentos **no** son públicos; se leen con `GET /files/documents/:ownerId/:filename` (ver sección *Archivos privados*).
 
 ---
 
@@ -161,16 +174,24 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
 ### `PATCH /users/:id/verify`
 - **Descripción:** Endpoint administrativo para aprobar o rechazar la verificación de un usuario/transportista.
 - **Autenticación:** Requerida (`ADMIN`).
-- **Body:** `{ "status": "APPROVED" | "REJECTED", "reason": "..." }`
-- **Respuesta (200 OK):** Estado de documentación del usuario actualizado.
+- **Body:** `{ "action": "approve" | "reject", "note"?: "..." }`
+- **Reglas:** el usuario debe tener `documentsStatus = PENDING`; si no, 400. Notifica al transportista.
+- **Respuesta (200 OK):** `{ id, documentsStatus }` actualizado.
 
 ---
 
 ### `GET /users`
 - **Descripción:** Listado paginado de usuarios para moderación y administración.
 - **Autenticación:** Requerida (`ADMIN`).
-- **Query Params:** `role`, `status`, `page`, `limit`.
-- **Respuesta (200 OK):** Lista de usuarios y metadatos de paginación.
+- **Query Params:** `role`, `documentsStatus` (`NONE|PENDING|APPROVED|REJECTED`), `page`, `limit`.
+- **Respuesta (200 OK):** Lista de usuarios (incluye `phone`, `documentsUrl`, `avatarUrl`, `emailVerified` y `trucks`) y metadatos de paginación.
+
+---
+
+### `GET /users/verification/summary`
+- **Descripción:** Contadores de la cola de verificación de transportistas (alimenta el panel `/admin`).
+- **Autenticación:** Requerida (`ADMIN`).
+- **Respuesta (200 OK):** `{ "data": { "NONE": 0, "PENDING": 0, "APPROVED": 0, "REJECTED": 0 } }`
 
 ---
 
@@ -216,10 +237,10 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
 ---
 
 ### `POST /trucks/:id/documents`
-- **Descripción:** Carga o adjunta URLs de documentación técnica (VTR, VTM, SENASA, Póliza de seguro).
+- **Descripción:** Sube un documento del camión (VTV, SENASA, póliza). Se guarda en `uploads/documents/trucks/<truckId>/`. Solo el dueño del camión o un ADMIN (se valida **antes** de escribir el archivo).
 - **Autenticación:** Requerida (`DRIVER` o `ADMIN`).
-- **Body:** `{ "documentsUrl": ["https://..."] }`
-- **Respuesta (200 OK):** Objeto `Truck` actualizado.
+- **Body:** `multipart/form-data` con un archivo en el campo `document` (PDF/JPG/PNG, ≤ 5 MB).
+- **Respuesta (200 OK):** Objeto `Truck` con `documentsUrl` actualizado.
 
 ---
 
@@ -235,8 +256,9 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
 ### `GET /trips`
 - **Descripción:** Lista los viajes publicados. Admite búsqueda por origen, destino, tipo de carga, estado y paginación.
 - **Autenticación:** Requerida.
-- **Query Params:** `origin`, `destination`, `cargoType`, `status`, `page`, `limit`.
-- **Respuesta (200 OK):** Lista de viajes y contador total.
+- **Query Params:** `cargoType`, `status`, `minPrice`, `maxPrice`, `lat`/`lng`/`radius` (cercanía), `mine=true`, `page`, `limit`.
+- **Visibilidad (por rol):** `ADMIN` ve todo · `COMPANY` solo sus propios viajes (incluye borradores) · `DRIVER` solo viajes en subasta (`AUCTION`) o en los que ya ofertó. `mine=true` limita a los propios (empresa: creados; transportista: asignados).
+- **Respuesta (200 OK):** `{ data: Trip[], meta: { total, page, limit } }`.
 
 ---
 
@@ -266,6 +288,7 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
 ### `GET /trips/:id`
 - **Descripción:** Obtiene la información detallada de un viaje por su ID (incluye origen, destino, oferta ganadora y datos de contacto si corresponde).
 - **Autenticación:** Requerida.
+- **Visibilidad:** si el usuario no puede ver el viaje (borrador ajeno, viaje privado de otra empresa) responde **404**, no 403. El historial GPS (`trackingLogs`) solo se incluye para las partes (dueño, transportista adjudicado, admin).
 - **Respuesta (200 OK):** Objeto `Trip` completo con sus relaciones.
 
 ---
@@ -338,11 +361,12 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
   ```json
   {
     "tripId": "uuid-del-viaje",
-    "type": "OPEN",
+    "type": "OPEN | DUTCH | SEALED",
     "endTime": "2026-08-10T18:00:00.000Z",
     "reservePrice": 400000.00
   }
   ```
+- **Tipos:** `OPEN` (inversa: cada oferta debe bajar ≥ 10 %, anti-sniping), `DUTCH` (el precio baja solo de `basePrice` a `reservePrice` según el tiempo; el primero que pulsa «Tomar» gana al instante), `SEALED` (ofertas ocultas: el monto solo lo ven la empresa dueña, el admin y el propio oferente).
 - **Respuesta (201 Created):** Objeto `Auction`.
 
 ---
@@ -350,13 +374,14 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
 ### `GET /auctions/:id`
 - **Descripción:** Devuelve los datos de una subasta específica y su cuenta regresiva/tiempo restante.
 - **Autenticación:** Requerida.
-- **Respuesta (200 OK):** Objeto `Auction`.
+- **Respuesta (200 OK):** Objeto `Auction` con `bids`. Aplican las mismas reglas de visibilidad que en `/trips/:id` y, en `SEALED`, los montos ajenos vienen `null` con `sealed: true`. El teléfono del oferente solo lo ve el dueño del viaje.
 
 ---
 
 ### `POST /auctions/:id/bid`
 - **Descripción:** Permite a un transportista realizar una oferta (puja) en la subasta. El monto debe ser menor a la oferta actual menos la regla de paso mínimo (10%). Aplica anti-sniping automático si resta menos de 5 min.
 - **Autenticación:** Requerida (`DRIVER`).
+- **Notas por tipo:** en `DUTCH` el `amount` se ignora: se adjudica al precio vigente (bloqueo atómico, solo un ganador). En `SEALED` no se publica la oferta mínima.
 - **Body:**
   ```json
   {
@@ -372,14 +397,14 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
 ### `GET /auctions/:id/bids`
 - **Descripción:** Lista todas las ofertas realizadas en una subasta específica ordenadas cronológicamente de la mejor a la peor.
 - **Autenticación:** Requerida.
-- **Respuesta (200 OK):** Array de objetos `Bid`.
+- **Respuesta (200 OK):** Array de objetos `Bid` (con los montos redactados en subastas `SEALED` según el espectador).
 
 ---
 
 ### `PATCH /auctions/:id/extend`
 - **Descripción:** Extiende el tiempo de finalización de una subasta manualmente.
 - **Autenticación:** Requerida (`COMPANY` o `ADMIN`).
-- **Body:** `{ "minutes": 30 }`
+- **Body:** `{ "hours": 1-72 }` (entero)
 - **Respuesta (200 OK):** Subasta con nuevo `endTime`.
 
 ---
@@ -468,14 +493,14 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
 
 ### `GET /tracking/:tripId/current`
 - **Descripción:** Obtiene la última posición GPS conocida del vehículo en viaje.
-- **Autenticación:** Requerida.
+- **Autenticación:** Requerida y solo para las **partes del viaje** (empresa dueña, transportista adjudicado, admin); el resto recibe 403/404.
 - **Respuesta (200 OK):** Objeto `TrackingLog` más reciente.
 
 ---
 
 ### `GET /tracking/:tripId/history`
 - **Descripción:** Devuelve la lista histórica de puntos GPS registrados durante todo el trayecto para trazar la ruta en el mapa.
-- **Autenticación:** Requerida.
+- **Autenticación:** Requerida y solo para las partes del viaje (igual que `/current`).
 - **Respuesta (200 OK):** Array de objetos `TrackingLog`.
 
 ---
@@ -539,3 +564,21 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
   - **Transportista:** Total de subastas ganadas, ganancias brutas y netas acumuladas, viajes completados, rating actual.
 - **Autenticación:** Requerida.
 - **Respuesta (200 OK):** Objeto JSON con las métricas acumuladas y KPIs.
+
+---
+
+## 12. Archivos Privados (`/files`)
+
+La documentación sensible **no** se sirve como estático. Solo los avatares son públicos (`/uploads/avatars/...`). Todo lo demás se descarga autenticado, con `Cache-Control: private, no-store`.
+
+### `GET /files/documents/:ownerId/:filename`
+- **Descripción:** Descarga un documento de verificación de un usuario.
+- **Autenticación:** Requerida: el propio dueño o `ADMIN`.
+- **Respuesta:** el archivo; 404 si no existe o no hay permiso.
+
+---
+
+### `GET /files/documents/trucks/:truckId/:filename`
+- **Descripción:** Descarga un documento de un camión.
+- **Autenticación:** Requerida: dueño del camión o `ADMIN`.
+- **Seguridad:** `truckId`/`ownerId` deben ser UUID y `filename` un nombre plano (sin `/`, `..`): protección contra path traversal.

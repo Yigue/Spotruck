@@ -16,6 +16,7 @@ import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { useAuthStore } from '../hooks/useAuthStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { formatDuration } from '../utils/geo'
@@ -103,6 +104,8 @@ export default function TripDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showRating, setShowRating] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [profileUserId, setProfileUserId] = useState<string | null>(null)
   const [livePosition, setLivePosition] = useState<{
     lat: number
@@ -204,6 +207,21 @@ export default function TripDetailPage() {
   }
 
   const isOwnerCompany = user?.id === trip.user?.id
+  const canCancel = isOwnerCompany && ['DRAFT', 'OPEN', 'AUCTION', 'ASSIGNED'].includes(trip.status)
+
+  const cancelTrip = async () => {
+    setCancelling(true)
+    try {
+      await api.post(`/trips/${trip.id}/cancel`)
+      toast.success('Publicación cancelada')
+      setConfirmCancel(false)
+      refreshTrip()
+    } catch {
+      toast.error('No se pudo cancelar la publicación')
+    } finally {
+      setCancelling(false)
+    }
+  }
   const acceptedBid = trip.auction?.bids.find((b) => b.status === 'ACCEPTED')
   const isAssignedDriver = !!acceptedBid && user?.id === acceptedBid.user.id
 
@@ -239,6 +257,11 @@ export default function TripDetailPage() {
           {isOwnerCompany && trip.status === 'DRAFT' && (
             <Button variant="accent" onClick={publishTrip}>
               Publicar en subasta
+            </Button>
+          )}
+          {canCancel && (
+            <Button variant="danger" onClick={() => setConfirmCancel(true)}>
+              Cancelar publicación
             </Button>
           )}
           <Badge variant={trip.status === 'AUCTION' ? 'success' : 'info'}>
@@ -497,6 +520,16 @@ export default function TripDetailPage() {
 
       {/* Perfil público */}
       <UserProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
+
+      <ConfirmDialog
+        open={confirmCancel}
+        title="¿Cancelar esta publicación?"
+        description="Se cerrará la subasta y se rechazarán las ofertas recibidas. No se puede deshacer."
+        confirmLabel="Sí, cancelar"
+        loading={cancelling}
+        onConfirm={cancelTrip}
+        onCancel={() => setConfirmCancel(false)}
+      />
     </div>
   )
 }

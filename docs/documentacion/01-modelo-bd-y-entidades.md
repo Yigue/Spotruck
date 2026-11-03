@@ -44,6 +44,8 @@ erDiagram
         DateTime password_reset_expires
         DocumentsStatus documents_status
         String driver_license_url
+        String avatar_url
+        String_array documents_url
         String address
         String website
         String sector
@@ -268,6 +270,8 @@ Representa a los usuarios del sistema (Empresas, Transportistas y Administradore
 | `passwordResetExpires` | `DateTime?` | ✔️ | `null` | Fecha/hora de expiración del token de recupero. |
 | `documentsStatus` | `DocumentsStatus` | ❌ | `NONE` | Estado de homologación de documentos del chófer. |
 | `driverLicenseUrl` | `String?` | ✔️ | `null` | URL de la imagen/PDF de la licencia. |
+| `avatarUrl` | `String?` | ✔️ | `null` | Foto de perfil (`/uploads/avatars/<id>.<ext>`); único archivo público. |
+| `documentsUrl` | `String[]` | ❌ | `[]` | Documentos de verificación subidos (`/uploads/documents/<id>/...`); se descargan autenticados vía `/api/v1/files`. |
 | `address` | `String?` | ✔️ | `null` | Dirección comercial o fiscal. |
 | `website` | `String?` | ✔️ | `null` | Sitio web institucional. |
 | `sector` | `String?` | ✔️ | `null` | Rubro industrial de la empresa. |
@@ -293,7 +297,7 @@ Representa la flota de vehículos registrados por cada transportista (`DRIVER`).
 | `preferredCargo` | `CargoType?` | ✔️ | `null` | Tipo de carga preferida o adaptada. |
 | `senasaNumber` | `String?` | ✔️ | `null` | Habilitación SENASA para transporte alimenticio. |
 | `insurance` | `Json?` | ✔️ | `null` | Datos de póliza (Aseguradora, Vencimiento, Poliza). |
-| `documentsUrl` | `String[]` | ❌ | `[]` | Lista de URLs de documentos adjuntos. |
+| `documentsUrl` | `String[]` | ❌ | `[]` | Documentos del camión (`/uploads/documents/trucks/<truckId>/...`); descarga autenticada (dueño/admin) vía `/api/v1/files`. |
 | `active` | `Boolean` | ❌ | `true` | Estado activo/inactivo del vehículo. |
 | `createdAt` | `DateTime` | ❌ | `now()` | Fecha de registro en la flota. |
 | `updatedAt` | `DateTime` | ❌ | `updatedAt` | Fecha de última actualización. |
