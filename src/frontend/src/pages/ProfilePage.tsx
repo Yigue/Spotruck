@@ -12,6 +12,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { Spinner } from '../components/ui/Spinner'
 import { Avatar } from '../components/ui/Avatar'
 import { ProtectedFileLink } from '../components/ui/ProtectedFileLink'
+import { FileInput } from '../components/ui/FileInput'
 import { validateCuit } from '../utils/cuit'
 
 interface Truck {
@@ -346,12 +347,11 @@ export default function ProfilePage() {
         <div className="flex items-center gap-4 flex-wrap">
           <Avatar name={me.companyName || me.email} src={me.avatarUrl ?? undefined} size="lg" />
           <div className="flex-1 min-w-[220px]">
-            <input
-              type="file"
+            <FileInput
               accept="image/jpeg,image/png,image/webp"
-              aria-label="Elegir imagen de avatar"
-              onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm text-text-muted file:mr-3 file:rounded file:border-0 file:bg-primary file:text-white file:px-3 file:py-1.5 file:text-sm file:cursor-pointer"
+              label="Elegir imagen de avatar"
+              files={avatarFile ? [avatarFile] : null}
+              onChange={(fl) => setAvatarFile(fl?.[0] ?? null)}
             />
             <p className="text-xs text-text-muted mt-1">JPG, PNG o WebP de hasta 2 MB</p>
           </div>
@@ -418,13 +418,13 @@ export default function ProfilePage() {
           )}
 
           <div className="flex items-center gap-3 flex-wrap">
-            <input
-              type="file"
+            <FileInput
               multiple
               accept="application/pdf,image/jpeg,image/png"
-              aria-label="Subí tu licencia, cédula y seguro"
-              onChange={(e) => setDocFiles(e.target.files)}
-              className="flex-1 min-w-[220px] text-sm text-text-muted file:mr-3 file:rounded file:border-0 file:bg-primary file:text-white file:px-3 file:py-1.5 file:text-sm file:cursor-pointer"
+              label="Subí tu licencia, cédula y seguro"
+              files={docFiles}
+              onChange={setDocFiles}
+              className="flex-1 min-w-[220px]"
             />
             <Button
               size="sm"

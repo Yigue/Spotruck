@@ -21,17 +21,20 @@ export function BarChart({
 }) {
   const max = Math.max(...data.map((d) => d.value), 1)
   return (
-    <div className="flex items-end gap-2 h-44">
+    <div className="flex gap-2 h-44" role="img" aria-label="Gráfico de barras">
       {data.map((d) => (
-        <div key={d.label} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-          <span className="text-[10px] font-mono text-text-muted">
+        <div key={d.label} className="flex-1 flex flex-col items-center gap-1 min-w-0 h-full">
+          <span className="text-[10px] font-mono text-text-muted h-3 leading-3">
             {d.value > 0 ? valueFormatter(d.value) : ''}
           </span>
-          <div
-            className={`w-full rounded-t ${color} transition-all`}
-            style={{ height: `${Math.max((d.value / max) * 100, d.value > 0 ? 4 : 1)}%` }}
-            title={`${d.label}: ${d.value.toLocaleString('es-AR')}`}
-          />
+          {/* La altura en % necesita un contenedor con alto definido */}
+          <div className="flex-1 w-full flex items-end">
+            <div
+              className={`w-full rounded-t ${color} transition-all`}
+              style={{ height: `${Math.max((d.value / max) * 100, d.value > 0 ? 4 : 1)}%` }}
+              title={`${d.label}: ${d.value.toLocaleString('es-AR')}`}
+            />
+          </div>
           <span className="text-[10px] text-text-muted truncate w-full text-center">{d.label}</span>
         </div>
       ))}

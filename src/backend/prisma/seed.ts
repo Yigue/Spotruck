@@ -364,10 +364,14 @@ async function main() {
     },
   })
 
-  // Update driver stats
+  // Estadísticas denormalizadas, coherentes con las valoraciones de arriba
   await prisma.user.update({
     where: { id: driver1.id },
-    data: { ratingAvg: 4.5, ratingCount: 1, tripsCompleted: 1 },
+    data: { ratingAvg: 5, ratingCount: 1, tripsCompleted: 1 },
+  })
+  await prisma.user.update({
+    where: { id: company.id },
+    data: { ratingAvg: 4, ratingCount: 1 },
   })
 
   console.log('✅ Ratings created')

@@ -25,13 +25,13 @@ const formatPrice = (price: number) => {
 const typeLabels = {
   OPEN: 'Abierta',
   DUTCH: 'Holandesa',
-  SEALED: 'Cerrada',
+  SEALED: 'Sellada',
 }
 
 const statusInfo: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'default' }> = {
   PENDING: { label: 'Pendiente', variant: 'warning' },
   OPEN: { label: 'En subasta', variant: 'success' },
-  CLOSED: { label: 'Cerrada', variant: 'default' },
+  CLOSED: { label: 'Finalizada', variant: 'default' },
   SETTLED: { label: 'Adjudicada', variant: 'info' },
   CANCELLED: { label: 'Cancelada', variant: 'error' },
 }
@@ -60,20 +60,19 @@ export function AuctionCard({ auction, trip, onClick }: AuctionCardProps) {
         </div>
 
         {/* Current price + countdown en vivo */}
-        <div className="flex items-center justify-between">
-          <div>
-            <span className={`font-mono font-bold text-accent ${auction.type === 'DUTCH' ? 'text-3xl' : 'text-2xl'}`}>
+        <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
+          <div className="min-w-0">
+            <span className={`font-mono font-bold text-accent whitespace-nowrap ${auction.type === 'DUTCH' ? 'text-2xl' : 'text-xl'}`}>
               {formatPrice(auction.currentPrice)}
             </span>
             {auction.type === 'DUTCH' && auction.status === 'OPEN' && (
               <span className="block text-xs text-warning font-medium">⏬ Precio baja en vivo</span>
             )}
           </div>
-          <AuctionCountdown endTime={auction.endTime} status={auction.status} />
+          <span className="whitespace-nowrap">
+            <AuctionCountdown endTime={auction.endTime} status={auction.status} />
+          </span>
         </div>
-        {auction.type === 'DUTCH' && auction.status === 'OPEN' && (
-          <p className="text-xs text-accent">↓ Precio baja en vivo</p>
-        )}
 
         {/* Bid count — en SEALED no se revela cuántos compiten */}
         {auction.type !== 'SEALED' && (

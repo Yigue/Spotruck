@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { fallbackLocalities, fallbackProvinces, haversineKm } from './geoFallback'
 
 // API Georef (datos.gob.ar) — catálogo oficial de provincias y localidades de Argentina
 const GEOREF = 'https://apis.datos.gob.ar/georef/api'
@@ -20,20 +21,51 @@ export interface RouteInfo {
   distanceKm: number
   durationMin: number
   geometry: [number, number][] // [lat, lng] para Polyline de Leaflet
+  // true cuando el servicio de rutas no respondió y se estimó en línea recta (+25 % por curvas, 60 km/h)
+  estimated?: boolean
 }
 
 export async function fetchProvinces(): Promise<Province[]> {
-  const { data } = await axios.get(`${GEOREF}/provincias`, {
-    params: { campos: 'id,nombre', max: 24, orden: 'nombre' },
-  })
-  return data.provincias
+  try {
+    const { data } = await axios.get(`${GEOREF}/provincias`, {
+      params: { campos: 'id,nombre', max: 24, orden: 'nombre' },
+      timeout: 8000,
+    })
+    if (Array.isArray(data.provincias) && data.provincias.length > 0) return data.provincias
+  } catch {
+    /* Georef caído o sin conexión: se usa el listado local */
+  }
+  return fallbackProvinces()
 }
 
 export async function fetchLocalities(provinceId: string): Promise<Locality[]> {
-  const { data } = await axios.get(`${GEOREF}/localidades`, {
-    params: { provincia: provinceId, campos: 'id,nombre,centroide', max: 1000, orden: 'nombre' },
-  })
-  return data.localidades
+  try {
+    const { data } = await axios.get(`${GEOREF}/localidades`, {
+      params: { provincia: provinceId, campos: 'id,nombre,centroide', max: 1000, orden: 'nombre' },
+      timeout: 8000,
+    })
+    if (Array.isArray(data.localidades) && data.localidades.length > 0) return data.localidades
+  } catch {
+    /* ver fetchProvinces */
+  }
+  return fallbackLocalities(provinceId)
+}
+
+// Estimación cuando OSRM no responde, para no dejar el viaje sin distancia ni duración
+export function estimateRoute(
+  origin: { lat: number; lng: number },
+  dest: { lat: number; lng: number }
+): RouteInfo {
+  const km = Math.round(haversineKm(origin, dest) * 1.25 * 10) / 10
+  return {
+    distanceKm: km,
+    durationMin: Math.round((km / 60) * 60),
+    geometry: [
+      [origin.lat, origin.lng],
+      [dest.lat, dest.lng],
+    ],
+    estimated: true,
+  }
 }
 
 export async function fetchRoute(
@@ -43,17 +75,17 @@ export async function fetchRoute(
   try {
     const { data } = await axios.get(
       `${OSRM}/${origin.lng},${origin.lat};${dest.lng},${dest.lat}`,
-      { params: { overview: 'simplified', geometries: 'geojson' } }
+      { params: { overview: 'simplified', geometries: 'geojson' }, timeout: 8000 }
     )
     const route = data.routes?.[0]
-    if (!route) return null
+    if (!route) return estimateRoute(origin, dest)
     return {
       distanceKm: Math.round(route.distance / 100) / 10,
       durationMin: Math.round(route.duration / 60),
       geometry: route.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]),
     }
   } catch {
-    return null
+    return estimateRoute(origin, dest)
   }
 }
 

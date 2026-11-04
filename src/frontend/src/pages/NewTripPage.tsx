@@ -277,15 +277,26 @@ export default function NewTripPage() {
           )}
 
           {route && (
-            <div className="flex gap-6 text-sm bg-background rounded p-3">
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm bg-background rounded p-3">
               <div>
                 <span className="text-text-muted">Distancia: </span>
-                <span className="font-semibold">{route.distanceKm} km</span>
+                <span className="font-semibold">
+                  {route.estimated ? '≈ ' : ''}
+                  {route.distanceKm} km
+                </span>
               </div>
               <div>
                 <span className="text-text-muted">Duración del viaje: </span>
-                <span className="font-semibold">{formatDuration(route.durationMin)}</span>
+                <span className="font-semibold">
+                  {route.estimated ? '≈ ' : ''}
+                  {formatDuration(route.durationMin)}
+                </span>
               </div>
+              {route.estimated && (
+                <p className="w-full text-xs text-text-muted">
+                  Estimación en línea recta: no pudimos calcular la ruta exacta.
+                </p>
+              )}
             </div>
           )}
 
