@@ -107,19 +107,29 @@ describe('LoginPage', () => {
     })
   })
 
-  it('shows alert on failure', async () => {
+  it('muestra un error inline (sin alert) con credenciales inválidas', async () => {
     const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {})
-    vi.mocked(api.post).mockRejectedValue(new Error('Invalid'))
+    vi.mocked(api.post).mockRejectedValue({ response: { status: 401 } })
 
     renderLogin()
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'bad@test.com' } })
     fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'wrong' } })
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }))
 
-    await waitFor(() => {
-      expect(alertMock).toHaveBeenCalledWith('Credenciales inválidas')
-    })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Email o contraseña incorrectos')
+    expect(alertMock).not.toHaveBeenCalled()
     alertMock.mockRestore()
+  })
+
+  it('distingue un error de red de unas credenciales inválidas', async () => {
+    vi.mocked(api.post).mockRejectedValue(new Error('Network Error'))
+
+    renderLogin()
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'a@test.com' } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'x' } })
+    fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/conectar con el servidor/i)
   })
 
   it('disables button while loading', async () => {

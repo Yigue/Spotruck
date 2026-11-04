@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
 import { useAuthStore } from '../hooks/useAuthStore'
@@ -13,12 +13,14 @@ const passwordRules = [
 ]
 
 export default function RegisterPage() {
+  const [searchParams] = useSearchParams()
+  const initialRole = searchParams.get('role') === 'DRIVER' ? 'DRIVER' : 'COMPANY'
   const [step, setStep] = useState<1 | 2>(1)
   const [form, setForm] = useState({
     email: '',
     password: '',
     passwordRepeat: '',
-    role: 'COMPANY' as 'COMPANY' | 'DRIVER',
+    role: initialRole as 'COMPANY' | 'DRIVER',
     companyName: '',
     companyCuit: '',
     address: '',

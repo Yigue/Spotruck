@@ -2,23 +2,31 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../utils/api'
 import { useAuthStore } from '../hooks/useAuthStore'
+import { Alert } from '../components/ui/Alert'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
   const setAuth = useAuthStore((s) => s.setAuth)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setError('')
     try {
       const { data } = await api.post('/auth/login', { email, password })
       setAuth(data.data, data.data.user)
       navigate('/dashboard')
-    } catch {
-      alert('Credenciales inválidas')
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status
+      setError(
+        status === 401 || status === 400
+          ? 'Email o contraseña incorrectos'
+          : 'No pudimos conectar con el servidor. Probá de nuevo en unos segundos.'
+      )
     } finally {
       setLoading(false)
     }
@@ -31,6 +39,11 @@ export default function LoginPage() {
         <p className="text-text-muted text-sm mb-6">Iniciá sesión para continuar</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div role="alert">
+              <Alert type="error">{error}</Alert>
+            </div>
+          )}
           <div>
             <label htmlFor="login-email" className="label">Email</label>
             <input
@@ -40,6 +53,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="tu@email.com"
+              autoComplete="email"
               required
             />
           </div>
@@ -52,6 +66,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
+              autoComplete="current-password"
               required
             />
           </div>

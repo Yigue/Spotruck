@@ -24,7 +24,10 @@ api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const original = err.config
-    if (err.response?.status === 401 && !original._retry) {
+    // Los endpoints de /auth devuelven 401 por credenciales/tokens inválidos: no hay
+    // sesión que refrescar y recargar la página borraría el mensaje de error.
+    const isAuthCall = typeof original?.url === 'string' && original.url.startsWith('/auth/')
+    if (err.response?.status === 401 && original && !original._retry && !isAuthCall) {
       original._retry = true
       try {
         const raw = localStorage.getItem('spottruck-auth')
@@ -42,7 +45,7 @@ api.interceptors.response.use(
         return api(original)
       } catch {
         localStorage.removeItem('spottruck-auth')
-        window.location.href = '/login'
+        if (window.location.pathname !== '/login') window.location.href = '/login'
       }
     }
     return Promise.reject(err)
