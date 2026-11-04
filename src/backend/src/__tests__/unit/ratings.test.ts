@@ -210,7 +210,7 @@ describe('RatingsService', () => {
   })
 
   describe('GET /ratings/user/:userId', () => {
-    it('returns up to 50 ratings for a user', async () => {
+    it('returns up to 50 ratings for a user (sin exponer la ruta de los viajes)', async () => {
       const mockRatings = [
         {
           id: 'rating-1',
@@ -250,7 +250,7 @@ describe('RatingsService', () => {
         take: 50,
         include: {
           fromUser: { select: { id: true, companyName: true, role: true } },
-          trip: { select: { id: true, originAddress: true, destAddress: true } },
+          trip: { select: { id: true } },
         },
       })
       expect(res.json).toHaveBeenCalledWith({ data: mockRatings })

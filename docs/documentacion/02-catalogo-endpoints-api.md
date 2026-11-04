@@ -257,7 +257,7 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
 ### `GET /trips`
 - **Descripción:** Lista los viajes publicados. Admite búsqueda por origen, destino, tipo de carga, estado y paginación.
 - **Autenticación:** Requerida.
-- **Query Params:** `cargoType`, `status`, `minPrice`, `maxPrice`, `lat`/`lng`/`radius` (cercanía), `mine=true`, `page`, `limit`.
+- **Query Params:** `cargoType`, `status`, `minPrice`, `maxPrice`, `lat`/`lng`/`radius` (km, cercanía al **origen**), `origin` y `dest` (texto parcial, sin distinguir mayúsculas; permiten buscar el «viaje de vuelta»), `sort` (`recent` · `date` salida más próxima · `price_asc` · `price_desc`; otro valor → 400), `mine=true`, `page`, `limit`. Todos los filtros se combinan en AND.
 - **Visibilidad (por rol):** `ADMIN` ve todo · `COMPANY` solo sus propios viajes (incluye borradores) · `DRIVER` solo viajes en subasta (`AUCTION`) o en los que ya ofertó. `mine=true` limita a los propios (empresa: creados; transportista: asignados).
 - **Respuesta (200 OK):** `{ data: Trip[], meta: { total, page, limit } }`.
 
@@ -530,7 +530,7 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
 ### `GET /ratings/user/:userId`
 - **Descripción:** Obtiene la lista de calificaciones y comentarios recibidos por un usuario.
 - **Autenticación:** Requerida.
-- **Respuesta (200 OK):** Array de objeto `Rating` con datos del emisor.
+- **Respuesta (200 OK):** Hasta 50 reseñas (las más recientes primero) con `score`, subpuntajes, `comment`, `createdAt` y el emisor (`fromUser`: id, nombre, rol). Las reseñas son públicas para usuarios autenticados y **no** exponen la ruta del viaje (sólo su `id`). Se muestran en el perfil público y en el detalle del postulante.
 
 ---
 

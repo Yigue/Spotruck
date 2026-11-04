@@ -189,13 +189,20 @@ El sistema legacy fue estructurado bajo un patrón MVC tradicional en PHP:
 | `/trips/new` | Publicar viaje | Empresa | Formulario con mapa, provincias/localidades (Georef), tipo de subasta (`OPEN`/`DUTCH`/`SEALED`) y borrador. |
 | `/trips/:id` | Detalle del viaje | Todos* | Mapa con ruta, subasta en vivo, postulantes (modal con perfil y Aceptar/Rechazar), pago, estado del viaje con stepper, GPS en vivo, calificación y **Cancelar publicación** (dueño, estados `DRAFT/OPEN/AUCTION/ASSIGNED`). *Sujeto a las reglas de visibilidad. |
 | `/auctions`, `/auctions/:id` | Subastas | Todos | Subastas activas con cuenta regresiva y WebSocket. |
-| `/explore` | Explorar en mapa | Transportista | Viajes cercanos con radio de búsqueda. |
+| `/explore` | Explorar | Transportista | Vista **Mapa** o **Lista**; búsqueda por origen/destino (el «viaje de vuelta»: p. ej. destino *Misiones*), tipo de carga, orden (recientes, salida, precio) y **Cerca de mí** con radio (50–500 km, usa la geolocalización del navegador). Marcadores propios, encuadre automático y selector Mapa/Satélite. |
 | `/my-bids` | Mis ofertas | Transportista | Historial de postulaciones; editar o retirar mientras estén `PENDING`. |
+| `/ayuda` | Guía de usuario | Público | Pasos para transportistas y empresas (del informe original), con enlace para crear la cuenta del rol elegido. También desde el menú lateral. |
 | `/stats` | Estadísticas | Todos | Gráficos mensuales de gasto/ingresos y KPIs. |
 | `/profile` | Perfil | Todos | Datos, foto, flota de camiones y documentación (descarga autenticada vía `/files`). |
 | `/admin` | Verificaciones | Admin | Cola de transportistas con documentación pendiente: ver documentos, aprobar o rechazar (`PATCH /users/:id/verify`), contadores por estado. |
 
 Cualquier otra ruta muestra una página **404** con enlace de regreso (al panel si hay sesión, a la portada si no). Todas las pantallas privadas se cargan de forma diferida (`React.lazy`), lo que reduce el bundle inicial de ~500 kB a ~270 kB.
+
+### Mapas, servicios externos y tolerancia a fallos
+- **Mapa / Satélite:** todos los mapas incluyen el selector de capas (OpenStreetMap y Esri World Imagery), como el Google Maps de la app original.
+- **Georef (provincias/localidades):** si no responde, se usa un listado local de las 24 jurisdicciones y la capital de cada una como localidad; el formulario de nuevo viaje sigue funcionando.
+- **OSRM (ruta, distancia, duración):** si no responde, se estima en línea recta (+25 %, 60 km/h) y se marca con «≈».
+- **Opiniones:** el perfil público de cualquier usuario y el detalle del postulante muestran las reseñas recibidas.
 
 ### Reglas transversales
 - **Visibilidad:** la empresa ve solo sus viajes; el transportista ve los viajes en subasta y aquellos donde ya ofertó; los borradores nunca son públicos. Lo no visible responde 404.
