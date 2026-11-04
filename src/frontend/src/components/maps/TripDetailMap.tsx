@@ -1,5 +1,6 @@
-import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet'
+import { MapContainer, Marker, Polyline, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import { BaseLayers } from './BaseLayers'
 import L from 'leaflet'
 
 interface TripDetailMapProps {
@@ -44,10 +45,7 @@ export function TripDetailMap({ originLat, originLng, destLat, destLng, originAd
       className="w-full h-full min-h-[400px] rounded-lg"
       scrollWheelZoom={false}
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <BaseLayers />
       <Marker position={[originLat, originLng]} icon={originIcon}>
         <Popup>
           <strong>Origen</strong>

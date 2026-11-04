@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet'
+import { MapContainer, Marker, Polyline, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import { BaseLayers } from './BaseLayers'
 import L from 'leaflet'
 import toast from 'react-hot-toast'
 import api from '../../utils/api'
@@ -155,10 +156,7 @@ export function LiveTrackingMap({
           className="w-full h-[400px]"
           scrollWheelZoom={false}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          <BaseLayers />
           <Marker position={[originLat, originLng]} icon={originIcon}>
             <Popup>Origen</Popup>
           </Marker>

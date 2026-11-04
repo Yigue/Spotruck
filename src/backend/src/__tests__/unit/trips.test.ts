@@ -140,6 +140,63 @@ describe('TripsService', () => {
 
 
 
+    it('busca por texto en origen y destino sin distinguir mayúsculas (viaje de vuelta)', async () => {
+      mockPrisma.trip.findMany.mockResolvedValue([])
+      mockPrisma.trip.count.mockResolvedValue(0)
+
+      const req = mockReq({}, {}, { dest: 'misiones', origin: ' buenos aires ' })
+      const res = mockRes()
+      const next = mockNext()
+
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
+      await handler(req, res, next)
+
+      expect(next).not.toHaveBeenCalledWith(expect.anything())
+      expect(mockPrisma.trip.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              expect.objectContaining({
+                destAddress: { contains: 'misiones', mode: 'insensitive' },
+                originAddress: { contains: 'buenos aires', mode: 'insensitive' },
+              }),
+              { userId: 'company-1' },
+            ],
+          },
+        })
+      )
+    })
+
+    it.each([
+      ['date', { scheduledDate: 'asc' }],
+      ['price_asc', { basePrice: 'asc' }],
+      ['price_desc', { basePrice: 'desc' }],
+    ])('ordena por %s', async (sort, orderBy) => {
+      mockPrisma.trip.findMany.mockResolvedValue([])
+      mockPrisma.trip.count.mockResolvedValue(0)
+
+      const req = mockReq({}, {}, { sort })
+      const res = mockRes()
+      const next = mockNext()
+
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
+      await handler(req, res, next)
+
+      expect(mockPrisma.trip.findMany).toHaveBeenCalledWith(expect.objectContaining({ orderBy }))
+    })
+
+    it('rechaza un orden inválido', async () => {
+      const req = mockReq({}, {}, { sort: 'DROP TABLE' })
+      const res = mockRes()
+      const next = mockNext()
+
+      const handler = (tripsRouter as any).stack.find((l: any) => l.route?.path === '/' && l.route?.methods?.get)?.route?.stack[1]?.handle
+      await handler(req, res, next)
+
+      expect(mockPrisma.trip.findMany).not.toHaveBeenCalled()
+      expect(next).toHaveBeenCalled()
+    })
+
     it('applies status and cargoType filters', async () => {
 
       mockPrisma.trip.findMany.mockResolvedValue([])

@@ -202,6 +202,8 @@ r = await api('POST', '/auth/login', null, { email: resetEmail, password: 'Passw
 check('la contraseña vieja ya no sirve → 401', r.status === 401)
 r = await api('POST', '/auth/reset-password', null, { token: resetToken, password: 'OtraPass1' })
 check('token de un solo uso (reuso → 400)', r.status === 400)
+// idempotente: un run anterior interrumpido pudo dejar el token
+await sql(`UPDATE users SET password_reset_token=NULL WHERE password_reset_token='tok-vencido'`)
 await sql(`UPDATE users SET password_reset_expires = NOW() - INTERVAL '1 minute', password_reset_token='tok-vencido' WHERE email='${resetEmail}'`)
 r = await api('POST', '/auth/reset-password', null, { token: 'tok-vencido', password: 'OtraPass1' })
 check('token vencido → 400', r.status === 400)
@@ -318,6 +320,27 @@ for (const [label, path] of [['GET /trips/:id', `/trips/${sTrip10}`], ['GET /auc
   check(`SELLADA ${label}: no expone montos ajenos`, seen.length > 0 && ajenos.length > 0 && ajenos.every((b) => b.amount === null), JSON.stringify(seen.map((b) => b.amount)))
 }
 check('SELLADA: la empresa dueña ve todos los montos', (await peek(`/auctions/${sAuc10}/bids`, CO2)).every((b) => typeof b.amount === 'number'))
+
+// ════════ E11: Búsqueda y orden para el «viaje de vuelta» ════════
+console.log('\nE11 — Búsqueda por origen/destino, cercanía y orden')
+const tag = `Zz${Date.now() % 100000}`
+const mk = async (extra) => (await api('POST', '/trips', CO, { ...baseTrip, ...extra })).body.data
+const vueltaA = await mk({ originAddress: `Buenos Aires ${tag}`, destAddress: `Posadas, Misiones ${tag}`, originLat: -34.6, originLng: -58.4, basePrice: 90000, scheduledDate: new Date(Date.now() + 5 * 86400e3).toISOString() })
+const vueltaB = await mk({ originAddress: `Rosario ${tag}`, destAddress: `Córdoba ${tag}`, originLat: -32.9, originLng: -60.6, basePrice: 40000, scheduledDate: new Date(Date.now() + 2 * 86400e3).toISOString() })
+const tripIds = (x) => (x.body.data ?? []).map((t) => t.id)
+check('dest=misiones (sin distinguir mayúsculas) encuentra el viaje de vuelta', tripIds(await api('GET', `/trips?dest=MISIONES%20${tag}`, CO)).join() === vueltaA.id)
+check('origin parcial encuentra el viaje', tripIds(await api('GET', `/trips?origin=rosar&dest=${tag}`, CO)).join() === vueltaB.id)
+check('origin + dest se combinan en AND', tripIds(await api('GET', `/trips?origin=rosario&dest=posadas`, CO)).length === 0)
+const porPrecio = tripIds(await api('GET', `/trips?dest=${tag}&sort=price_asc`, CO))
+check('sort=price_asc ordena de menor a mayor', porPrecio[0] === vueltaB.id && porPrecio[1] === vueltaA.id)
+const porPrecioDesc = tripIds(await api('GET', `/trips?dest=${tag}&sort=price_desc`, CO))
+check('sort=price_desc ordena de mayor a menor', porPrecioDesc[0] === vueltaA.id)
+const porFecha = tripIds(await api('GET', `/trips?dest=${tag}&sort=date`, CO))
+check('sort=date muestra primero la salida más próxima', porFecha[0] === vueltaB.id)
+check('un sort inválido responde 400', (await api('GET', '/trips?sort=DROP', CO)).status === 400)
+const cerca = tripIds(await api('GET', `/trips?dest=${tag}&lat=-34.6&lng=-58.4&radius=50`, CO))
+check('cercanía: a 50 km de Buenos Aires sólo está el viaje porteño', cerca.join() === vueltaA.id)
+check('la búsqueda respeta la visibilidad: otra empresa no ve estos borradores', tripIds(await api('GET', `/trips?dest=${tag}`, CO2)).length === 0)
 
 console.log(`\n${'═'.repeat(50)}`)
 console.log(`RESULTADO: ${passed} ✓ | ${failed} ✗`)

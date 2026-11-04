@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet'
+import { MapContainer, Marker, Polyline, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import { BaseLayers } from '../components/maps/BaseLayers'
 import L from 'leaflet'
 import api from '../utils/api'
 import toast from 'react-hot-toast'
@@ -253,10 +254,7 @@ export default function NewTripPage() {
                 className="w-full h-64"
                 scrollWheelZoom={false}
               >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
+                <BaseLayers />
                 {origin.locality && (
                   <Marker
                     position={[origin.locality.centroide.lat, origin.locality.centroide.lon]}

@@ -58,12 +58,23 @@ const tripWhereSchema = z.object({
   // Wave 1: mine=true limita la lista a los viajes propios (empresa: creados;
   // transportista: asignados vía oferta aceptada). Se combina en AND con el resto.
   mine: z.enum(['true', 'false']).optional(),
+  // Búsqueda por texto en origen/destino (p. ej. «viaje de vuelta» a Misiones) y orden
+  origin: z.string().trim().min(1).max(100).optional(),
+  dest: z.string().trim().min(1).max(100).optional(),
+  sort: z.enum(['recent', 'date', 'price_asc', 'price_desc']).optional(),
 })
+
+const tripOrderBy = {
+  recent: { createdAt: 'desc' },
+  date: { scheduledDate: 'asc' },
+  price_asc: { basePrice: 'asc' },
+  price_desc: { basePrice: 'desc' },
+} as const
 
 // GET /trips
 router.get('/', authenticate, async (req, res, next) => {
   try {
-    const { status, cargoType, minPrice, maxPrice, lat, lng, radius, page = '1', limit = '20', mine } = tripWhereSchema.parse(req.query)
+    const { status, cargoType, minPrice, maxPrice, lat, lng, radius, page = '1', limit = '20', mine, origin, dest, sort = 'recent' } = tripWhereSchema.parse(req.query)
     const where: Record<string, any> = {}
     if (mine === 'true') {
       if (req.user!.role === 'DRIVER') {
@@ -74,6 +85,8 @@ router.get('/', authenticate, async (req, res, next) => {
     }
     if (status) where.status = status
     if (cargoType) where.cargoType = cargoType
+    if (origin) where.originAddress = { contains: origin, mode: 'insensitive' }
+    if (dest) where.destAddress = { contains: dest, mode: 'insensitive' }
     if (minPrice || maxPrice) {
       where.basePrice = {}
       if (minPrice) where.basePrice.gte = Number(minPrice)
@@ -84,11 +97,11 @@ router.get('/', authenticate, async (req, res, next) => {
       const ids: Array<{ id: string }> = await prisma.$queryRaw`
         SELECT id FROM trips
         WHERE (
-          6371 * acos(
+          6371 * acos(LEAST(1.0, GREATEST(-1.0,
             cos(radians(${Number(lat)})) * cos(radians(origin_lat)) *
             cos(radians(origin_lng) - radians(${Number(lng)})) +
             sin(radians(${Number(lat)})) * sin(radians(origin_lat))
-          )
+          )))
         ) <= ${Number(radius)}
       `
       where.id = { in: ids.map((x) => x.id) }
@@ -103,7 +116,7 @@ router.get('/', authenticate, async (req, res, next) => {
         where: finalWhere,
         skip: (Number(page) - 1) * Number(limit),
         take: Number(limit),
-        orderBy: { createdAt: 'desc' },
+        orderBy: tripOrderBy[sort],
         include: {
           user: { select: { id: true, companyName: true, ratingAvg: true } },
           auction: { select: { id: true, status: true, currentPrice: true, type: true, endTime: true } },
