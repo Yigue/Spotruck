@@ -20,6 +20,7 @@ interface Truck {
   capacityKg: number
   preferredCargo?: string | null
   senasaNumber?: string | null
+  documentsUrl?: string[]
   active: boolean
 }
 
@@ -83,6 +84,7 @@ export default function ProfilePage() {
   const [truckForm, setTruckForm] = useState(emptyTruckForm)
   const [truckSaving, setTruckSaving] = useState(false)
   const [deleteTruck, setDeleteTruck] = useState<Truck | null>(null)
+  const [truckDocUploading, setTruckDocUploading] = useState<string | null>(null)
 
   const loadMe = () => {
     api.get('/users/me').then(({ data }) => {
@@ -224,6 +226,33 @@ export default function ProfilePage() {
       toast.error(message)
     } finally {
       setAvatarUploading(false)
+    }
+  }
+
+  const handleTruckDocUpload = async (truckId: string, file?: File) => {
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(`${file.name} supera los 5 MB permitidos`)
+      return
+    }
+    if (!['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
+      toast.error('Solo se aceptan PDF, JPG o PNG')
+      return
+    }
+    setTruckDocUploading(truckId)
+    try {
+      const fd = new FormData()
+      fd.append('document', file)
+      await api.post(`/trucks/${truckId}/documents`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      toast.success('Documento del camión subido')
+      loadMe()
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message || 'No se pudo subir el documento'
+      toast.error(message)
+    } finally {
+      setTruckDocUploading(null)
     }
   }
 
@@ -469,24 +498,48 @@ export default function ProfilePage() {
           ) : (
             <div className="space-y-3">
               {(me.trucks ?? []).map((t) => (
-                <div key={t.id} className="flex items-center gap-3 p-3 bg-background rounded">
-                  <span className="text-2xl">🚛</span>
-                  <div className="flex-1">
-                    <p className="font-medium">
-                      {t.plate} <span className="text-text-muted">— {t.type}</span>
-                    </p>
-                    <p className="text-xs text-text-muted">
-                      {t.capacityKg.toLocaleString('es-AR')} kg
-                      {t.senasaNumber && ` · Senasa ${t.senasaNumber}`}
-                    </p>
+                <div key={t.id} className="p-3 bg-background rounded space-y-2">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-2xl">🚛</span>
+                    <div className="flex-1 min-w-[160px]">
+                      <p className="font-medium">
+                        {t.plate} <span className="text-text-muted">— {t.type}</span>
+                      </p>
+                      <p className="text-xs text-text-muted">
+                        {t.capacityKg.toLocaleString('es-AR')} kg
+                        {t.senasaNumber && ` · Senasa ${t.senasaNumber}`}
+                      </p>
+                    </div>
+                    {!t.active && <Badge variant="warning">Inactivo</Badge>}
+                    <Button size="sm" variant="ghost" onClick={() => openTruckModal(t)}>
+                      Editar
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => setDeleteTruck(t)}>
+                      Eliminar
+                    </Button>
                   </div>
-                  {!t.active && <Badge variant="warning">Inactivo</Badge>}
-                  <Button size="sm" variant="ghost" onClick={() => openTruckModal(t)}>
-                    Editar
-                  </Button>
-                  <Button size="sm" variant="danger" onClick={() => setDeleteTruck(t)}>
-                    Eliminar
-                  </Button>
+                  <div className="pl-10 text-sm space-y-1">
+                    {(t.documentsUrl ?? []).map((url) => (
+                      <div key={url} className="flex items-center gap-2">
+                        <span>📎</span>
+                        <ProtectedFileLink url={url} className="truncate" />
+                      </div>
+                    ))}
+                    <label className="inline-block cursor-pointer text-primary hover:underline text-xs">
+                      {truckDocUploading === t.id ? 'Subiendo…' : '+ Adjuntar documento (VTV, Senasa, póliza)'}
+                      <input
+                        type="file"
+                        accept="application/pdf,image/jpeg,image/png"
+                        className="hidden"
+                        data-testid={`truck-doc-${t.id}`}
+                        disabled={truckDocUploading === t.id}
+                        onChange={(e) => {
+                          handleTruckDocUpload(t.id, e.target.files?.[0])
+                          e.target.value = ''
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
               ))}
             </div>
