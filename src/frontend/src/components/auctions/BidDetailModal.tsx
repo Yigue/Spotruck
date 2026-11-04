@@ -6,6 +6,7 @@ import { Modal } from '../ui/Modal'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
+import { UserProfileModal } from '../users/UserProfileModal'
 import type { BidWithDetails } from './BidList'
 
 interface BidDetailModalProps {
@@ -40,6 +41,7 @@ const Stars = ({ avg, count }: { avg: number; count: number }) => (
 export function BidDetailModal({ bid, canDecide, showAmount = true, onClose, onDecided }: BidDetailModalProps) {
   const [confirm, setConfirm] = useState<'accept' | 'reject' | null>(null)
   const [loading, setLoading] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   if (!bid) return null
 
@@ -60,7 +62,8 @@ export function BidDetailModal({ bid, canDecide, showAmount = true, onClose, onD
 
   return (
     <>
-      <Modal open={!!bid} onClose={onClose}>
+      {/* Mientras se ve el perfil, el detalle se oculta para no apilar dos modales */}
+      <Modal open={!!bid && !profileOpen} onClose={onClose}>
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <Avatar name={bid.user.companyName} src={bid.user.avatarUrl ?? undefined} size="lg" />
@@ -87,6 +90,14 @@ export function BidDetailModal({ bid, canDecide, showAmount = true, onClose, onD
               </a>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setProfileOpen(true)}
+            className="text-sm text-primary font-medium hover:underline"
+          >
+            Ver perfil y opiniones →
+          </button>
 
           <div className="divide-y divide-secondary-500/10 text-sm">
             <div className="flex justify-between py-2">
@@ -141,6 +152,8 @@ export function BidDetailModal({ bid, canDecide, showAmount = true, onClose, onD
           )}
         </div>
       </Modal>
+
+      <UserProfileModal userId={profileOpen ? bid.user.id : null} onClose={() => setProfileOpen(false)} />
 
       <ConfirmDialog
         open={confirm === 'accept'}

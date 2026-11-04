@@ -18,6 +18,28 @@ const steps = [
   },
 ]
 
+const problems = [
+  {
+    icon: '🌾',
+    title: 'En cosecha falta logística',
+    text: 'Los productores agropecuarios tienen una altísima demanda de transporte y pierden tiempo, dinero e incluso la cosecha por no conseguir camiones.',
+  },
+  {
+    icon: '🪵',
+    title: 'El camión que vuelve vacío',
+    text: 'Quien llega de Misiones cargado de madera necesita un viaje de vuelta; si no, pierde las ganancias del viaje. Acá encuentra un abanico de viajes para planificar su recorrido.',
+  },
+]
+
+const benefits = [
+  { icon: '⏱️', text: 'Ahorra tiempo' },
+  { icon: '💬', text: 'Comunicación rápida' },
+  { icon: '🏆', text: 'Más competitividad' },
+  { icon: '💰', text: 'Ahorro de dinero' },
+  { icon: '🧭', text: 'Más posibilidades' },
+  { icon: '📊', text: 'Estadísticas y gráficos' },
+]
+
 const auctionTypes = [
   { name: 'Abierta', text: 'Cada oferta debe bajar al menos 10 %. Con extensión automática anti-sniping.' },
   { name: 'Holandesa', text: 'El precio baja solo con el tiempo; gana el primero que pulsa «Tomar».' },
@@ -32,6 +54,9 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <span className="text-xl font-bold text-accent">Spottruck</span>
           <nav className="flex items-center gap-3 text-sm">
+            <Link to="/ayuda" className="px-3 py-2 hover:text-accent transition-colors hidden sm:inline">
+              Cómo usar
+            </Link>
             <Link to="/login" className="px-3 py-2 hover:text-accent transition-colors">
               Iniciar sesión
             </Link>
@@ -63,6 +88,29 @@ export default function LandingPage() {
                 Soy transportista
               </Link>
             </div>
+          </div>
+        </section>
+
+        <section className="max-w-5xl mx-auto px-4 pt-12" aria-labelledby="problema">
+          <h2 id="problema" className="text-xl font-bold text-center mb-2">
+            Un problema de los dos lados
+          </h2>
+          <p className="text-center text-text-muted max-w-2xl mx-auto mb-8">
+            Muchas industrias, productores e individuos no encuentran logística, y a su vez hay conductores que no
+            encuentran viajes. Spottruck acelera el contacto entre ambos.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2">
+            {problems.map((p) => (
+              <div key={p.title} className="card flex gap-4">
+                <div className="text-3xl" aria-hidden="true">
+                  {p.icon}
+                </div>
+                <div>
+                  <h3 className="font-bold mb-1">{p.title}</h3>
+                  <p className="text-sm text-text-muted">{p.text}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -98,6 +146,27 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className="max-w-5xl mx-auto px-4 py-12" aria-labelledby="beneficios">
+          <h2 id="beneficios" className="text-xl font-bold text-center mb-8">
+            Beneficios
+          </h2>
+          <ul className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {benefits.map((b) => (
+              <li key={b.text} className="card flex items-center gap-3">
+                <span className="text-2xl" aria-hidden="true">
+                  {b.icon}
+                </span>
+                <span className="font-medium text-sm">{b.text}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="text-center mt-8">
+            <Link to="/ayuda" className="text-primary font-medium hover:underline">
+              Ver la guía de usuario paso a paso →
+            </Link>
           </div>
         </section>
       </main>

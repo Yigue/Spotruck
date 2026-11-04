@@ -19,6 +19,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import LandingPage from './pages/LandingPage'
 import NotFoundPage from './pages/NotFoundPage'
+import GuidePage from './pages/GuidePage'
 import Layout from './components/Layout'
 import { Spinner } from './components/ui/Spinner'
 
@@ -48,6 +49,7 @@ export default function App() {
       <Suspense fallback={<PageFallback />}>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/ayuda" element={<GuidePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />

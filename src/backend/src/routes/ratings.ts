@@ -81,7 +81,8 @@ router.get('/user/:userId', authenticate, async (req, res, next) => {
       take: 50,
       include: {
         fromUser: { select: { id: true, companyName: true, role: true } },
-        trip: { select: { id: true, originAddress: true, destAddress: true } },
+        // Las reseñas son públicas: no se expone la ruta de viajes ajenos
+        trip: { select: { id: true } },
       },
     })
     res.json({ data: ratings })

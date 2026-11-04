@@ -48,6 +48,11 @@ describe('App routing', () => {
     expect(await screen.findByText(/Iniciá sesión para continuar/i)).toBeInTheDocument()
   })
 
+  it('la guía de usuario es pública', () => {
+    renderAt('/ayuda')
+    expect(screen.getByRole('heading', { level: 1, name: /guía de usuario/i })).toBeInTheDocument()
+  })
+
   it('muestra 404 para rutas inexistentes', () => {
     renderAt('/ruta-que-no-existe')
     expect(screen.getByRole('heading', { name: /página no encontrada/i })).toBeInTheDocument()

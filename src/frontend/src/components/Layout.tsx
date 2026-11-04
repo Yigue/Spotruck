@@ -78,6 +78,9 @@ export default function Layout() {
           <div className="mb-3">
             <NotificationBell />
           </div>
+          <Link to="/ayuda" className="block text-xs text-secondary-300 hover:text-white mb-3">
+            ❔ Guía de usuario
+          </Link>
           <div className="flex items-center gap-3 mb-2">
             <Avatar name={displayName} src={user?.avatarUrl ?? undefined} size="md" />
             <div className="text-sm min-w-0">

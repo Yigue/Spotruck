@@ -21,28 +21,43 @@ interface PublicProfile {
   trucks?: { id: string; plate: string; type: string; capacityKg: number }[]
 }
 
+interface Review {
+  id: string
+  score: number
+  comment?: string | null
+  createdAt: string
+  fromUser: { id: string; companyName?: string | null; role: string }
+}
+
 interface UserProfileModalProps {
   userId: string | null
   onClose: () => void
 }
 
-const Stars = ({ avg, count }: { avg: number; count: number }) => (
+const Stars = ({ avg, count, hideCount = false }: { avg: number; count: number; hideCount?: boolean }) => (
   <span className="text-warning text-sm">
     {[1, 2, 3, 4, 5].map((s) => (
       <span key={s} className={s <= Math.round(avg) ? 'text-warning' : 'text-secondary-300'}>
         ★
       </span>
     ))}
-    <span className="text-text-muted ml-1">({count})</span>
+    {!hideCount && <span className="text-text-muted ml-1">({count})</span>}
   </span>
 )
 
 export function UserProfileModal({ userId, onClose }: UserProfileModalProps) {
   const [profile, setProfile] = useState<PublicProfile | null>(null)
+  const [reviews, setReviews] = useState<Review[] | null>(null)
 
   useEffect(() => {
     if (!userId) return
     setProfile(null)
+    setReviews(null)
+    // Las opiniones de otros usuarios ayudan a elegir (paridad con la app original)
+    api
+      .get(`/ratings/user/${userId}`)
+      .then(({ data }) => setReviews(data.data))
+      .catch(() => setReviews([]))
     api
       .get(`/users/${userId}/profile`)
       .then(({ data }) => setProfile(data.data))
@@ -61,7 +76,7 @@ export function UserProfileModal({ userId, onClose }: UserProfileModalProps) {
             <Avatar name={profile.companyName} size="lg" />
             <div className="flex-1">
               <p className="font-bold">
-                {profile.companyName || 'Usuario'}
+                {profile.companyName || (profile.role === 'DRIVER' ? 'Transportista' : profile.role === 'COMPANY' ? 'Empresa' : 'Usuario')}
                 {profile.documentsStatus === 'APPROVED' && (
                   <span className="ml-2 text-xs bg-success/10 text-success px-2 py-0.5 rounded-full align-middle">
                     ✓ Verificado
@@ -117,6 +132,32 @@ export function UserProfileModal({ userId, onClose }: UserProfileModalProps) {
               </div>
             )}
           </div>
+
+          <section aria-label="Opiniones" className="border-t border-secondary-500/10 pt-3">
+            <h3 className="font-bold text-sm mb-2">Opiniones</h3>
+            {reviews === null ? (
+              <p className="text-sm text-text-muted">Cargando opiniones…</p>
+            ) : reviews.length === 0 ? (
+              <p className="text-sm text-text-muted">Todavía no tiene opiniones.</p>
+            ) : (
+              <ul className="space-y-3 max-h-56 overflow-y-auto pr-1">
+                {reviews.slice(0, 10).map((r) => (
+                  <li key={r.id} className="text-sm bg-background rounded p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <Stars avg={r.score} count={0} hideCount />
+                      <span className="text-xs text-text-muted">
+                        {new Date(r.createdAt).toLocaleDateString('es-AR')}
+                      </span>
+                    </div>
+                    {r.comment && <p className="mt-1">{r.comment}</p>}
+                    <p className="text-xs text-text-muted mt-1">
+                      — {r.fromUser.companyName || (r.fromUser.role === 'DRIVER' ? 'Transportista' : 'Empresa')}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
       )}
     </Modal>
