@@ -116,8 +116,10 @@ describe('Auth Flow', () => {
 
       expect(res.status).toBe(200)
       expect(res.body.data).toMatchObject({
-        user: { email, role: 'COMPANY' },
+        user: { email, role: 'COMPANY', companyName: 'Login Test Co' },
       })
+      expect(res.body.data.user).toHaveProperty('avatarUrl')
+      expect(res.body.data.user).not.toHaveProperty('passwordHash')
       expect(res.body.data.accessToken).toBeDefined()
       expect(res.body.data.refreshToken).toBeDefined()
     })

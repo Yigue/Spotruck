@@ -87,7 +87,7 @@ router.post('/register', async (req, res, next) => {
     )
 
     const tokens = signTokens(user.id, user.role, user.email)
-    res.status(201).json({ data: { user: { id: user.id, email: user.email, role: user.role }, ...tokens } })
+    res.status(201).json({ data: { user: { id: user.id, email: user.email, role: user.role, companyName: user.companyName, avatarUrl: user.avatarUrl }, ...tokens } })
   } catch (err) {
     next(err)
   }
@@ -105,7 +105,7 @@ router.post('/login', async (req, res, next) => {
     if (!valid) return next(errors.unauthorized('Invalid credentials'))
 
     const tokens = signTokens(user.id, user.role, user.email)
-    res.json({ data: { user: { id: user.id, email: user.email, role: user.role }, ...tokens } })
+    res.json({ data: { user: { id: user.id, email: user.email, role: user.role, companyName: user.companyName, avatarUrl: user.avatarUrl }, ...tokens } })
   } catch (err) {
     next(err)
   }

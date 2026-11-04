@@ -1,6 +1,9 @@
+import { useEffect } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../hooks/useAuthStore'
 import { NotificationBell } from './notifications/NotificationBell'
+import { Avatar } from './ui/Avatar'
+import api from '../utils/api'
 
 const navItems: { to: string; label: string; icon: string; driverOnly?: boolean; adminOnly?: boolean }[] = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -13,8 +16,20 @@ const navItems: { to: string; label: string; icon: string; driverOnly?: boolean;
   { to: '/profile', label: 'Mi perfil', icon: '👤' },
 ]
 
+const roleLabels: Record<string, string> = { COMPANY: 'Empresa', DRIVER: 'Transportista', ADMIN: 'Administrador' }
+
 export default function Layout() {
-  const { user, logout } = useAuthStore()
+  const { user, logout, updateUser } = useAuthStore()
+  const displayName = user?.companyName || user?.email
+
+  // Sesiones guardadas antes de que el login devolviera nombre/foto: se completan una vez
+  useEffect(() => {
+    if (!user || (user.companyName !== undefined && user.avatarUrl !== undefined)) return
+    api
+      .get('/users/me')
+      .then(({ data }) => updateUser({ companyName: data.data.companyName ?? null, avatarUrl: data.data.avatarUrl ?? null }))
+      .catch(() => {})
+  }, [user, updateUser])
   const location = useLocation()
   const visibleNavItems = navItems.filter(
     (item) =>
@@ -63,9 +78,12 @@ export default function Layout() {
           <div className="mb-3">
             <NotificationBell />
           </div>
-          <div className="text-sm mb-2">
-            <p className="font-medium">{user?.companyName || user?.email}</p>
-            <p className="text-xs text-secondary-500">{user?.role}</p>
+          <div className="flex items-center gap-3 mb-2">
+            <Avatar name={displayName} src={user?.avatarUrl ?? undefined} size="md" />
+            <div className="text-sm min-w-0">
+              <p className="font-medium truncate" title={displayName}>{displayName}</p>
+              <p className="text-xs text-secondary-300">{roleLabels[user?.role ?? ''] ?? user?.role}</p>
+            </div>
           </div>
           <button
             onClick={logout}

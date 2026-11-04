@@ -52,7 +52,7 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
     "phone": "+5491144332211"
   }
   ```
-- **Respuesta (201 Created):** Retorna el objeto `user` recién creado (sin hash de contraseña) y los tokens `accessToken` y `refreshToken`.
+- **Respuesta (201 Created):** Retorna `user` (`id`, `email`, `role`, `companyName`, `avatarUrl`; nunca el hash de contraseña) y los tokens `accessToken` y `refreshToken`.
 
 ---
 
@@ -66,7 +66,8 @@ Especificación técnica detallada de todos los endpoints de la API REST del sis
     "password": "Password123!"
   }
   ```
-- **Respuesta (200 OK):** Devuelve `user`, `accessToken` (expira en 15 min) y `refreshToken` (expira en 7 días).
+- **Respuesta (200 OK):** Devuelve `user` (`id`, `email`, `role`, `companyName`, `avatarUrl`), `accessToken` (expira en 15 min) y `refreshToken` (expira en 7 días).
+- **Errores:** credenciales inválidas → `401 UNAUTHORIZED`. El frontend muestra el mensaje inline y **no** intenta refrescar tokens en endpoints `/auth/*`.
 
 ---
 

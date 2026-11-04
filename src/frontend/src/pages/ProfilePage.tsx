@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
+import { useAuthStore } from '../hooks/useAuthStore'
 import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
@@ -90,6 +91,8 @@ export default function ProfilePage() {
     api.get('/users/me').then(({ data }) => {
       setMe(data.data)
       const u = data.data
+      // mantiene el nombre/foto del menú lateral sincronizados con el perfil
+      useAuthStore.getState().updateUser({ companyName: u.companyName, avatarUrl: u.avatarUrl })
       setForm({
         companyName: u.companyName ?? '',
         companyCuit: u.companyCuit ?? '',

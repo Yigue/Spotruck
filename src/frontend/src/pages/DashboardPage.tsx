@@ -97,7 +97,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-text mb-6">
+      <h1 className="text-xl md:text-2xl font-bold text-text mb-6 break-words">
         Hola, {user?.companyName || user?.email}
       </h1>
 

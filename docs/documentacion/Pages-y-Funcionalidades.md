@@ -180,7 +180,8 @@ El sistema legacy fue estructurado bajo un patrón MVC tradicional en PHP:
 
 | Ruta | Pantalla | Rol | Qué hace |
 |---|---|---|---|
-| `/login`, `/register` | Login / Registro | Público | Alta con validación de CUIT (dígito verificador) y acceso con JWT. |
+| `/` | Portada | Público | Landing (paridad con `index.html` del legacy): cómo funciona, tipos de subasta y CTA por rol (`/register?role=COMPANY\|DRIVER` preselecciona el rol). Con sesión iniciada redirige a `/dashboard`. |
+| `/login`, `/register` | Login / Registro | Público | Alta con validación de CUIT (dígito verificador) y acceso con JWT. Errores de login inline y accesibles (`role="alert"`). |
 | `/forgot-password`, `/reset-password` | Recupero de contraseña | Público | Envía enlace de reseteo (Resend, o simulado sin credenciales) y fija nueva clave. |
 | `/verify-email` | Verificación de email | Público | Confirma el token recibido por correo. |
 | `/dashboard` | Panel principal | Todos | KPIs por rol (`/stats/me`), lista de viajes relevantes (empresa: sus publicaciones; transportista: sus viajes o los disponibles) y acciones rápidas por rol. |
@@ -193,6 +194,8 @@ El sistema legacy fue estructurado bajo un patrón MVC tradicional en PHP:
 | `/stats` | Estadísticas | Todos | Gráficos mensuales de gasto/ingresos y KPIs. |
 | `/profile` | Perfil | Todos | Datos, foto, flota de camiones y documentación (descarga autenticada vía `/files`). |
 | `/admin` | Verificaciones | Admin | Cola de transportistas con documentación pendiente: ver documentos, aprobar o rechazar (`PATCH /users/:id/verify`), contadores por estado. |
+
+Cualquier otra ruta muestra una página **404** con enlace de regreso (al panel si hay sesión, a la portada si no). Todas las pantallas privadas se cargan de forma diferida (`React.lazy`), lo que reduce el bundle inicial de ~500 kB a ~270 kB.
 
 ### Reglas transversales
 - **Visibilidad:** la empresa ve solo sus viajes; el transportista ve los viajes en subasta y aquellos donde ya ofertó; los borradores nunca son públicos. Lo no visible responde 404.
